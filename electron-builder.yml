@@ -1,0 +1,16 @@
+appId: com.sifangshangxing.kimi-chat-client
+productName: 四方上行 Chat Client
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - dist-electron/**/*
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
