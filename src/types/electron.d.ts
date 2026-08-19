@@ -7,6 +7,7 @@ export interface ElectronAPI {
     messages: Array<{ role: string; content: string }>
   }) => void
   abortMessage: (payload: { id: number }) => void
+  selectFolder: () => Promise<string | null>
   testApi: (config: ApiConfig) => Promise<{
     ok: boolean
     error?: string

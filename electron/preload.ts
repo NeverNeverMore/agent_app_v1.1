@@ -8,6 +8,7 @@ export interface ElectronAPI {
     messages: Array<{ role: string; content: string }>
   }) => void
   abortMessage: (payload: { id: number }) => void
+  selectFolder: () => Promise<string | null>
   testApi: (config: ApiConfig) => Promise<{
     ok: boolean
     error?: string
@@ -27,6 +28,7 @@ export interface ElectronAPI {
 const api: ElectronAPI = {
   sendMessage: (payload) => ipcRenderer.send('send-message', payload),
   abortMessage: (payload) => ipcRenderer.send('abort-message', payload),
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
   testApi: (config) => ipcRenderer.invoke('test-api', config),
   onStreamChunk: (callback) => {
     const handler = (_event: IpcRendererEvent, data: { id: number; content: string }) =>

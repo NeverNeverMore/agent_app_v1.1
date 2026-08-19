@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ApiConfig } from '../shared/types'
@@ -218,4 +218,13 @@ ipcMain.handle('test-api', async (_event, config: ApiConfig) => {
     const message = error instanceof Error ? error.message : String(error)
     return { ok: false, error: message }
   }
+})
+
+ipcMain.handle('select-folder', async () => {
+  if (!mainWindow) return null
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择项目文件夹',
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  return result.canceled ? null : result.filePaths[0] ?? null
 })

@@ -3,7 +3,7 @@ import { X, Eye, EyeOff, Check, AlertCircle, Loader2 } from 'lucide-react'
 import type { ApiConfig } from '../../shared/types'
 import { MODEL_SUGGESTIONS } from '../../shared/config'
 
-interface SettingsModalProps {
+interface SettingsDrawerProps {
   isOpen: boolean
   config: ApiConfig
   onSave: (patch: Partial<ApiConfig>) => void
@@ -16,19 +16,21 @@ type TestStatus =
   | { type: 'success'; models: number }
   | { type: 'error'; message: string }
 
-export function SettingsModal({
+export function SettingsDrawer({
   isOpen,
   config,
   onSave,
   onClose,
-}: SettingsModalProps) {
+}: SettingsDrawerProps) {
   const [draft, setDraft] = useState<ApiConfig>(config)
   const [showKey, setShowKey] = useState(false)
   const [testStatus, setTestStatus] = useState<TestStatus>({ type: 'idle' })
+  const [isSaved, setIsSaved] = useState(false)
 
   useEffect(() => {
     setDraft(config)
     setTestStatus({ type: 'idle' })
+    setIsSaved(false)
   }, [config, isOpen])
 
   if (!isOpen) return null
@@ -36,6 +38,7 @@ export function SettingsModal({
   const handleChange = (patch: Partial<ApiConfig>) => {
     setDraft((prev) => ({ ...prev, ...patch }))
     setTestStatus({ type: 'idle' })
+    setIsSaved(false)
   }
 
   const handleSave = () => {
@@ -44,7 +47,7 @@ export function SettingsModal({
       baseUrl: draft.baseUrl.trim(),
       model: draft.model.trim(),
     })
-    onClose()
+    setIsSaved(true)
   }
 
   const handleTest = async () => {
@@ -53,6 +56,7 @@ export function SettingsModal({
       return
     }
     setTestStatus({ type: 'loading' })
+    setIsSaved(false)
     try {
       const result = await window.electronAPI.testApi({
         apiKey: draft.apiKey.trim(),
@@ -73,15 +77,27 @@ export function SettingsModal({
   const canTest = Boolean(draft.apiKey.trim() && draft.baseUrl.trim())
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>设置</h3>
-          <button onClick={onClose} className="icon-button" aria-label="关闭">
+    <div className="drawer-overlay">
+      <aside
+        className="settings-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
+        <div className="drawer-header">
+          <h3 id="settings-title">设置</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-button"
+            aria-label="关闭设置"
+            title="关闭"
+          >
             <X size={20} />
           </button>
         </div>
-        <div className="modal-body">
+
+        <div className="drawer-body">
           <div className="field">
             <label htmlFor="api-key">接口密钥</label>
             <div className="input-with-button">
@@ -161,17 +177,20 @@ export function SettingsModal({
             </div>
           )}
 
-          <p className="hint">设置项会保存在本地，但对话内容关闭应用后清空。</p>
+          <p className="hint">
+            设置、会话历史和项目文件夹关联会保存在本地。
+          </p>
         </div>
-        <div className="modal-footer">
-          <button onClick={onClose} className="secondary">
-            取消
-          </button>
-          <button onClick={handleSave} className="primary">
+
+        <div className="drawer-footer">
+          <span className={`save-status ${isSaved ? 'visible' : ''}`}>
+            {isSaved ? '已保存' : ''}
+          </span>
+          <button type="button" onClick={handleSave} className="primary">
             保存
           </button>
         </div>
-      </div>
+      </aside>
     </div>
   )
 }
