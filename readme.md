@@ -20,7 +20,7 @@
 ## 项目结构
 
 ```
-agent_app_v1.1/
+./
 ├── electron/
 │   ├── main.ts          # Electron 主进程，代理 API 请求、解析 SSE
 │   └── preload.ts       # 安全暴露给渲染进程的 IPC API
@@ -51,7 +51,7 @@ agent_app_v1.1/
 ### 安装依赖
 
 ```bash
-cd D:\root\codex\workspace\agent_app_v1.1
+cd .
 npm install
 ```
 
