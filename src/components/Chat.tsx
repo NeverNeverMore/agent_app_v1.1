@@ -11,6 +11,8 @@ interface ChatProps {
   onAbort: () => void
   projectFolder: string
   onSelectFolder: () => void
+  onApproveTool: (approvalId: string, argumentsHash: string) => void
+  onRejectTool: (approvalId: string) => void
 }
 
 export function Chat({
@@ -20,6 +22,8 @@ export function Chat({
   onAbort,
   projectFolder,
   onSelectFolder,
+  onApproveTool,
+  onRejectTool,
 }: ChatProps) {
   const [input, setInput] = useState('')
   const [thinkingSeconds, setThinkingSeconds] = useState(0)
@@ -78,7 +82,7 @@ export function Chat({
           </div>
         )}
         {messages.map((message, index) => (
-          <MessageItem key={index} message={message} />
+          <MessageItem key={index} message={message} onApproveTool={onApproveTool} onRejectTool={onRejectTool} />
         ))}
         {isLoading && (
           <div className="thinking-status" role="status" aria-live="polite">

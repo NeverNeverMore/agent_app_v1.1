@@ -8,7 +8,12 @@ function loadConfig(): ApiConfig {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      return { ...DEFAULT_API_CONFIG, ...JSON.parse(saved) }
+      const parsed = JSON.parse(saved) as Partial<ApiConfig>
+      return {
+        ...DEFAULT_API_CONFIG,
+        ...parsed,
+        protocol: parsed.protocol === 'anthropic' ? 'anthropic' : 'openai',
+      }
     }
   } catch {}
   return DEFAULT_API_CONFIG

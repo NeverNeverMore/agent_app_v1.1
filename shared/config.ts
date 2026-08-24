@@ -12,6 +12,7 @@ export const DEFAULT_API_CONFIG: ApiConfig = {
   apiKey: '',
   baseUrl: API_BASE_URL,
   model: DEFAULT_MODEL,
+  protocol: 'openai',
 }
 
 export const MODEL_SUGGESTIONS = [

@@ -835,3 +835,201 @@ input {
   max-width: min(100%, 520px);
   border-radius: 8px;
 }
+.tool-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tool-call {
+  border: 1px solid #d9d9e3;
+  border-radius: 8px;
+  background: #f7f7fa;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.tool-call summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.tool-call-name {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.tool-call-state {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #666;
+}
+
+.tool-call.success .tool-call-state {
+  color: #1a7f37;
+}
+
+.tool-call.failed .tool-call-state {
+  color: #cf222e;
+}
+
+.tool-call-detail {
+  padding: 8px 10px;
+  border-top: 1px solid #e5e5ec;
+}
+
+.approval-card {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #e2b93b;
+  border-radius: 6px;
+  background: #fffaf0;
+}
+.approval-card.approved { border-color: #8ac79b; background: #f2fbf4; }
+.approval-card.rejected, .approval-card.expired, .approval-card.cancelled { border-color: #d9d9e3; background: #f7f7fa; }
+.approval-title { font-weight: 600; margin-bottom: 7px; }
+.approval-row { display: flex; gap: 10px; margin: 4px 0; color: var(--text-secondary); }
+.approval-row code { color: var(--text); word-break: break-all; }
+.approval-preview { max-height: 140px; overflow: auto; margin: 8px 0; padding: 7px; background: #fff; border: 1px solid #ececf1; border-radius: 5px; white-space: pre-wrap; word-break: break-word; }
+.approval-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.approval-actions button { padding: 5px 12px; border-radius: 5px; font-size: 13px; }
+.approval-reject { color: #cf222e; border: 1px solid #e5a4aa; background: #fff; }
+.approval-approve { color: #fff; border: 1px solid var(--accent); background: var(--accent); }
+.approval-status { color: var(--text-secondary); font-size: 12px; margin-top: 6px; }
+
+.tool-call-label {
+  font-size: 12px;
+  color: #888;
+  margin: 4px 0 2px;
+}
+
+.tool-call-detail pre {
+  margin: 0;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #ececf1;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.tools-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.tools-group {
+  max-width: 860px;
+  margin: 0 auto 24px;
+}
+
+.tools-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.tools-group-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 8px;
+  line-height: 18px;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.tool-meta-card {
+  border: 1px solid #d9d9e3;
+  border-radius: 8px;
+  background: #f7f7fa;
+  font-size: 13px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool-meta-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tool-meta-display-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tool-meta-name {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tool-meta-permission {
+  margin-left: auto;
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.tool-meta-permission.read {
+  color: #1a7f37;
+  background: #e6f4ea;
+}
+
+.tool-meta-permission.write {
+  color: #9a6700;
+  background: #fff3d6;
+}
+
+.tool-meta-permission.dangerous {
+  color: #cf222e;
+  background: #fdeceb;
+}
+
+.tool-meta-description {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tool-meta-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.tool-meta-category {
+  color: var(--text-secondary);
+  background: #ececf1;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.tool-meta-requirements {
+  color: #9a6700;
+}

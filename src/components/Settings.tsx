@@ -13,7 +13,7 @@ interface SettingsDrawerProps {
 type TestStatus =
   | { type: 'idle' }
   | { type: 'loading' }
-  | { type: 'success'; models: number }
+  | { type: 'success'; models?: number }
   | { type: 'error'; message: string }
 
 export function SettingsDrawer({
@@ -46,6 +46,7 @@ export function SettingsDrawer({
       apiKey: draft.apiKey.trim(),
       baseUrl: draft.baseUrl.trim(),
       model: draft.model.trim(),
+      protocol: draft.protocol,
     })
     setIsSaved(true)
   }
@@ -62,9 +63,10 @@ export function SettingsDrawer({
         apiKey: draft.apiKey.trim(),
         baseUrl: draft.baseUrl.trim(),
         model: draft.model.trim(),
+        protocol: draft.protocol,
       })
       if (result.ok) {
-        setTestStatus({ type: 'success', models: result.models ?? 0 })
+        setTestStatus({ type: 'success', models: result.models })
       } else {
         setTestStatus({ type: 'error', message: result.error || '检测失败' })
       }
@@ -121,6 +123,18 @@ export function SettingsDrawer({
           </div>
 
           <div className="field">
+            <label htmlFor="api-protocol">协议</label>
+            <select
+              id="api-protocol"
+              value={draft.protocol}
+              onChange={(e) => handleChange({ protocol: e.target.value as ApiConfig['protocol'] })}
+            >
+              <option value="openai">OpenAI Compatible</option>
+              <option value="anthropic">Anthropic Messages</option>
+            </select>
+          </div>
+
+          <div className="field">
             <label htmlFor="api-url">API 请求地址</label>
             <input
               id="api-url"
@@ -171,7 +185,9 @@ export function SettingsDrawer({
               )}
               <span>
                 {testStatus.type === 'success'
-                  ? `连接成功，可用模型 ${testStatus.models} 个`
+                  ? testStatus.models === undefined
+                    ? '连接成功'
+                    : `连接成功，可用模型 ${testStatus.models} 个`
                   : testStatus.message}
               </span>
             </div>

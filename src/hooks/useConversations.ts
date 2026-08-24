@@ -51,6 +51,18 @@ function loadState(): ConversationsState {
             .filter(isConversation)
             .map((conversation) => ({
               ...conversation,
+              messages: conversation.messages.map((message) =>
+                message.role === 'assistant' && message.toolCalls
+                  ? {
+                      ...message,
+                      toolCalls: message.toolCalls.map((call) =>
+                        call.approval?.status === 'pending'
+                          ? { ...call, approval: { ...call.approval, status: 'cancelled' as const } }
+                          : call
+                      ),
+                    }
+                  : message
+              ),
               projectFolder:
                 typeof conversation.projectFolder === 'string'
                   ? conversation.projectFolder

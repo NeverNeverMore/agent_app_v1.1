@@ -2,6 +2,14 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ApiConfig } from '../shared/types'
+import {
+  approveApproval,
+  cancelApprovalsForRequest,
+  rejectApproval,
+} from './approvals'
+import { runAgentLoop } from './agentLoop'
+import { getToolRegistry } from './tools'
+import { protocolEndpoint } from './protocol'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -106,83 +114,35 @@ interface SendMessagePayload {
   id: number
   config: ApiConfig
   messages: Message[]
+  projectFolder?: string
+  conversationId?: string
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages } = payload
+  const { id, config, messages, projectFolder = '', conversationId = '' } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
   try {
-    const response = await fetch(`${config.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages,
-        stream: true,
-      }),
+    await runAgentLoop({
+      config,
+      messages,
+      projectFolder,
+      requestId: id,
+      conversationId,
       signal: controller.signal,
+      emitChunk: (content) => event.sender.send('stream-chunk', { id, content }),
+      emitToolEvent: (toolEvent) =>
+        event.sender.send('tool-event', { id, event: toolEvent }),
+      emitApproval: (approvalEvent) =>
+        event.sender.send('approval-event', { id, event: approvalEvent }),
     })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      event.sender.send('stream-error', {
-        id,
-        error: `HTTP ${response.status}: ${errorText || response.statusText}`,
-      })
-      return
-    }
-
-    const reader = response.body?.getReader()
-    if (!reader) {
-      event.sender.send('stream-error', { id, error: 'No response body' })
-      return
-    }
-
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data: ')) continue
-
-        const data = trimmed.slice(6)
-        if (data === '[DONE]') {
-          event.sender.send('stream-done', { id })
-          return
-        }
-
-        try {
-          const parsed = JSON.parse(data) as {
-            choices?: Array<{ delta?: { content?: string } }>
-          }
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) {
-            event.sender.send('stream-chunk', { id, content })
-          }
-        } catch {
-          // ignore malformed JSON lines
-        }
-      }
-    }
-
     event.sender.send('stream-done', { id })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     event.sender.send('stream-error', { id, error: message })
   } finally {
+    cancelApprovalsForRequest(id)
     abortControllers.delete(id)
   }
 })
@@ -193,11 +153,43 @@ ipcMain.on('abort-message', (_event, { id }: { id: number }) => {
     controller.abort()
     abortControllers.delete(id)
   }
+  cancelApprovalsForRequest(id)
 })
+
+ipcMain.handle(
+  'approve-tool',
+  (_event, { approvalId, argumentsHash }: { approvalId: string; argumentsHash: string }) =>
+    approveApproval(approvalId, argumentsHash)
+)
+
+ipcMain.handle('reject-tool', (_event, { approvalId }: { approvalId: string }) =>
+  rejectApproval(approvalId)
+)
 
 ipcMain.handle('test-api', async (_event, config: ApiConfig) => {
   try {
-    const response = await fetch(`${config.baseUrl}/models`, {
+    if (config.protocol === 'anthropic') {
+      const response = await fetch(protocolEndpoint(config.baseUrl, '/v1/messages'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: config.model,
+          max_tokens: 8,
+          messages: [{ role: 'user', content: 'Hi' }],
+        }),
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        return { ok: false, error: `HTTP ${response.status}: ${text || response.statusText}` }
+      }
+      return { ok: true }
+    }
+
+    const response = await fetch(`${config.baseUrl.replace(/\/+$/, '')}/models`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${config.apiKey}`,
@@ -228,3 +220,5 @@ ipcMain.handle('select-folder', async () => {
   })
   return result.canceled ? null : result.filePaths[0] ?? null
 })
+
+ipcMain.handle('list-tools', () => getToolRegistry().listMeta())

@@ -4,6 +4,7 @@ import { Chat } from './components/Chat'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { SettingsDrawer } from './components/Settings'
 import { Sidebar } from './components/Sidebar'
+import { ToolList } from './components/ToolList'
 import { useChat } from './hooks/useChat'
 import { useApiConfig } from './hooks/useApiConfig'
 import { useConversations } from './hooks/useConversations'
@@ -11,13 +12,9 @@ import type { Conversation, MainSection } from './types/chat'
 import { MODEL_DISPLAY_NAME } from '../shared/config'
 
 const sectionCopy: Record<
-  Exclude<MainSection, 'chat'>,
+  Exclude<MainSection, 'chat' | 'tools'>,
   { title: string; description: string }
 > = {
-  tools: {
-    title: '工具',
-    description: '工具能力入口已预留，后续可在这里管理应用工具。',
-  },
   skills: {
     title: 'Skills',
     description: 'Skills 能力入口已预留，后续可在这里管理可用技能。',
@@ -31,7 +28,7 @@ const sectionCopy: Record<
 function PlaceholderPanel({
   section,
 }: {
-  section: Exclude<MainSection, 'chat'>
+  section: Exclude<MainSection, 'chat' | 'tools'>
 }) {
   const copy = sectionCopy[section]
   return (
@@ -57,7 +54,7 @@ function App() {
     deleteConversation,
     setProjectFolder,
   } = useConversations()
-  const { isLoading, sendMessage, abortMessage } = useChat({
+  const { isLoading, sendMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
     config,
     activeConversation,
     updateConversation,
@@ -134,7 +131,11 @@ function App() {
               onAbort={abortMessage}
               projectFolder={activeConversation.projectFolder}
               onSelectFolder={handleSelectFolder}
+              onApproveTool={approveToolCall}
+              onRejectTool={rejectToolCall}
             />
+          ) : activeSection === 'tools' ? (
+            <ToolList />
           ) : (
             <PlaceholderPanel section={activeSection} />
           )}
