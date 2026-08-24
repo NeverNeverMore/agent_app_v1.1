@@ -53,6 +53,7 @@ function App() {
     renameConversation,
     deleteConversation,
     setProjectFolder,
+    setPermissionMode,
   } = useConversations()
   const { isLoading, sendMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
     config,
@@ -131,6 +132,8 @@ function App() {
               onAbort={abortMessage}
               projectFolder={activeConversation.projectFolder}
               onSelectFolder={handleSelectFolder}
+              permissionMode={activeConversation.permissionMode}
+              onPermissionModeChange={setPermissionMode}
               onApproveTool={approveToolCall}
               onRejectTool={rejectToolCall}
             />

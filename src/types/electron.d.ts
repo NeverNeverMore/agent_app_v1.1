@@ -1,7 +1,7 @@
 ﻿import type { ToolStreamEvent } from '../../shared/tools'
 import type { ToolMeta } from '../../shared/tools'
 import type { ApprovalStreamEvent } from '../../shared/approvals'
-import type { ApiConfig } from '../../shared/types'
+import type { ApiConfig, PermissionMode } from '../../shared/types'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -9,6 +9,7 @@ export interface ElectronAPI {
     config: ApiConfig
     messages: Array<{ role: string; content: string }>
     projectFolder: string
+    permissionMode: PermissionMode
     conversationId: string
   }) => void
   abortMessage: (payload: { id: number }) => void

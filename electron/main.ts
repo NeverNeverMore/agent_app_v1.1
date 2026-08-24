@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ApiConfig } from '../shared/types'
+import type { ApiConfig, PermissionMode } from '../shared/types'
 import {
   approveApproval,
   cancelApprovalsForRequest,
@@ -115,11 +115,12 @@ interface SendMessagePayload {
   config: ApiConfig
   messages: Message[]
   projectFolder?: string
+  permissionMode?: PermissionMode
   conversationId?: string
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages, projectFolder = '', conversationId = '' } = payload
+  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '' } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
@@ -128,6 +129,7 @@ ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
       config,
       messages,
       projectFolder,
+      permissionMode,
       requestId: id,
       conversationId,
       signal: controller.signal,

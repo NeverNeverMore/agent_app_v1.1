@@ -1,5 +1,7 @@
 ﻿import type { ToolCallRecord } from '../../shared/tools'
 
+import type { PermissionMode } from '../../shared/types'
+
 export interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -11,6 +13,7 @@ export interface Conversation {
   title: string
   messages: Message[]
   projectFolder: string
+  permissionMode: PermissionMode
   createdAt: number
   updatedAt: number
 }

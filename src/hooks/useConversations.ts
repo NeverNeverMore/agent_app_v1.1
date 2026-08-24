@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Conversation } from '../types/chat'
+import type { PermissionMode } from '../../shared/types'
 
 const STORAGE_KEY = 'chat-conversations-state'
 
@@ -24,6 +25,7 @@ function buildConversation(): Conversation {
     title: '新对话',
     messages: [],
     projectFolder: '',
+    permissionMode: 'ask',
     createdAt: now,
     updatedAt: now,
   }
@@ -67,6 +69,9 @@ function loadState(): ConversationsState {
                 typeof conversation.projectFolder === 'string'
                   ? conversation.projectFolder
                   : '',
+              permissionMode: (
+                conversation.permissionMode === 'full' ? 'full' : 'ask'
+              ) as PermissionMode,
             }))
         : []
 
@@ -189,6 +194,16 @@ export function useConversations() {
     [activeConversation.id, updateConversation]
   )
 
+  const setPermissionMode = useCallback(
+    (permissionMode: PermissionMode) => {
+      updateConversation(activeConversation.id, (conversation) => ({
+        ...conversation,
+        permissionMode,
+      }))
+    },
+    [activeConversation.id, updateConversation]
+  )
+
   return {
     conversations,
     activeConversation,
@@ -198,5 +213,6 @@ export function useConversations() {
     renameConversation,
     deleteConversation,
     setProjectFolder,
+    setPermissionMode,
   }
 }

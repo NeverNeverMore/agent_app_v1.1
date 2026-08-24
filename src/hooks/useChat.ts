@@ -229,6 +229,7 @@ export function useChat({
         config,
         messages: nextMessages,
         projectFolder: activeConversation.projectFolder,
+        permissionMode: activeConversation.permissionMode,
         conversationId,
       })
     },

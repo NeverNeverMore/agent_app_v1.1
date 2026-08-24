@@ -827,6 +827,8 @@ input {
 .project-folder-bar {
   display: flex;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   padding: 0 16px 12px;
   background: var(--surface);
 }
@@ -834,6 +836,130 @@ input {
 .project-folder-bar .folder-button {
   max-width: min(100%, 520px);
   border-radius: 8px;
+}
+
+.permission-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.permission-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.permission-trigger:hover:not(:disabled),
+.permission-selector.open .permission-trigger {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.permission-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.permission-trigger .permission-chevron {
+  transition: transform 0.15s ease;
+}
+
+.permission-selector.open .permission-chevron {
+  transform: rotate(180deg);
+}
+
+.permission-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: min(340px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgba(25, 25, 35, 0.16);
+}
+
+.permission-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.permission-option:hover,
+.permission-option:focus-visible {
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+
+.permission-option.selected {
+  background: #fff4ed;
+  color: #e85b16;
+}
+
+.permission-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.permission-option-copy strong {
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.permission-option-copy small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-option.selected small {
+  color: #e85b16;
+  opacity: 0.9;
+}
+
+.permission-check {
+  justify-self: end;
+  color: #e85b16;
+}
+
+@media (max-width: 640px) {
+  .permission-selector {
+    flex: 0 1 auto;
+  }
+
+  .permission-menu {
+    left: 0;
+  }
 }
 .tool-calls {
   display: flex;

@@ -9,6 +9,8 @@ import type { ToolContext } from './tools/types'
 import { requestModel as requestProtocolModel } from './protocol'
 import type { AgentMessage } from './protocol'
 
+import type { PermissionMode } from '../shared/types'
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
@@ -18,6 +20,7 @@ export interface AgentLoopOptions {
   config: ApiConfig
   messages: ChatMessage[]
   projectFolder: string
+  permissionMode: PermissionMode
   requestId: number
   conversationId: string
   signal: AbortSignal
@@ -29,7 +32,7 @@ export interface AgentLoopOptions {
 const MAX_TOOL_STEPS = 8
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
-  const { config, projectFolder, requestId, conversationId, signal, emitChunk, emitToolEvent, emitApproval } = options
+  const { config, projectFolder, permissionMode, requestId, conversationId, signal, emitChunk, emitToolEvent, emitApproval } = options
 
   const registry = getToolRegistry()
   const tools = registry.listExecutable()
@@ -40,6 +43,15 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   if (projectFolder) {
     systemPrompts.unshift(
       `你可以使用提供的工具来回答问题和完成任务。当前项目目录：${projectFolder}。file_list 和 file_read 工具使用相对于项目目录的路径，只能访问该目录内的文件。`
+    )
+  }
+  if (permissionMode === 'full') {
+    systemPrompts.unshift(
+      '当前权限模式为完全访问权限：file_write 无需用户确认，可按用户要求写入任意本地路径；请仍然谨慎确认目标路径和内容。'
+    )
+  } else {
+    systemPrompts.unshift(
+      '当前权限模式为请求批准：任何 file_write 操作都必须等待用户批准后才能执行。'
     )
   }
   const systemPrompt = systemPrompts.join('\n\n')
@@ -81,11 +93,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
         arguments: call.arguments || '{}',
       })
 
-      const context: ToolContext = { projectFolder, signal }
+      const context: ToolContext = { projectFolder, permissionMode, signal }
       const tool = registry.get(call.name)
       let executed: ExecutedToolCall
 
-      if (tool && tool.permission === 'write') {
+      if (tool && tool.permission === 'write' && permissionMode === 'ask') {
         // write 工具：挂起循环，等待用户确认（批准/拒绝/过期/停止取消）
         const args = call.arguments || '{}'
         let preview: ApprovalPreview | undefined
@@ -114,7 +126,16 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
         emitApproval({ type: 'request', request })
 
         const approvalStatus = await decision
-        if (signal.aborted) return
+        if (signal.aborted) {
+          emitToolEvent({
+            type: 'result',
+            callId: call.id,
+            status: 'failed',
+            summary: 'TOOL_ABORTED: 工具执行已被用户停止',
+            durationMs: 0,
+          })
+          return
+        }
 
         if (approvalStatus === 'approved') {
           // 执行前重新校验参数哈希，防止批准后参数被篡改

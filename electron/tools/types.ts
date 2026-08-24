@@ -15,8 +15,11 @@ export interface ToolInputSchema {
   required?: string[]
 }
 
+import type { PermissionMode } from '../../shared/types'
+
 export interface ToolContext {
   projectFolder: string
+  permissionMode: PermissionMode
   signal: AbortSignal
 }
 

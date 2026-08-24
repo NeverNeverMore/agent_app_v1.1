@@ -26,6 +26,18 @@ function resolveWithinRoot(projectFolder: string, relativePath: string): string 
   return resolved
 }
 
+function resolveWritePath(
+  projectFolder: string,
+  requestedPath: string,
+  allowOutsideRoot: boolean
+): string {
+  if (allowOutsideRoot) {
+    const base = projectFolder || process.cwd()
+    return path.resolve(base, requestedPath)
+  }
+  return resolveWithinRoot(projectFolder, requestedPath)
+}
+
 /* ---------- time_current ---------- */
 
 const timeCurrent: ToolDefinition = {
@@ -277,7 +289,11 @@ const fileWrite: ToolDefinition = {
     let targetPath = typeof args.path === 'string' ? args.path : ''
     let overwrite = false
     try {
-      const target = resolveWithinRoot(context.projectFolder, targetPath)
+      const target = resolveWritePath(
+        context.projectFolder,
+        targetPath,
+        context.permissionMode === 'full'
+      )
       targetPath = path.relative(context.projectFolder, target) || targetPath
       const stat = await fs.stat(target).catch(() => null)
       overwrite = stat?.isFile() ?? false
@@ -302,10 +318,14 @@ const fileWrite: ToolDefinition = {
         )
       }
       const relativePath = String(args.path)
-      if (path.isAbsolute(relativePath)) {
+      if (path.isAbsolute(relativePath) && context.permissionMode !== 'full') {
         return fail('FILE_ACCESS_ERROR', '只允许使用相对于项目文件夹的路径')
       }
-      const target = resolveWithinRoot(context.projectFolder, relativePath)
+      const target = resolveWritePath(
+        context.projectFolder,
+        relativePath,
+        context.permissionMode === 'full'
+      )
       const stat = await fs.stat(target).catch(() => null)
       if (stat?.isDirectory()) return fail('FILE_ACCESS_ERROR', '目标路径是目录，无法写入')
       await fs.mkdir(path.dirname(target), { recursive: true })
