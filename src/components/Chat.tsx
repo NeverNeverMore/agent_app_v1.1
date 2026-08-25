@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Check, ChevronUp, FolderOpen, Hand, Loader2, Send, ShieldAlert, Square } from 'lucide-react'
+import { AlertTriangle, Check, ChevronUp, FolderOpen, Hand, Loader2, Send, ShieldAlert, Square, X } from 'lucide-react'
 import type { Message } from '../types/chat'
 import { MessageItem } from './Message'
 import { MODEL_DISPLAY_NAME } from '../../shared/config'
@@ -125,7 +125,7 @@ export function Chat({
           </div>
         )}
         {messages.map((message, index) => (
-          <MessageItem key={index} message={message} onApproveTool={onApproveTool} onRejectTool={onRejectTool} />
+          <MessageItem key={index} message={message} />
         ))}
         {isLoading && (
           <div className="thinking-status" role="status" aria-live="polite">
@@ -135,6 +135,62 @@ export function Chat({
         )}
         <div ref={messagesEndRef} />
       </div>
+      {(() => {
+        const lastMsg = messages[messages.length - 1]
+        if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.toolCalls) return null
+        const pendingCalls = lastMsg.toolCalls.filter((c) => c.approval?.status === 'pending')
+        if (pendingCalls.length === 0) return null
+        const first = pendingCalls[0]
+        const preview = first.approval?.preview
+        return (
+          <div className="approval-banner">
+            <div className="approval-banner-icon">
+              <AlertTriangle size={20} />
+            </div>
+            <div className="approval-banner-body">
+              <div className="approval-banner-title">
+                请求确认：{first.name}
+              </div>
+              {preview?.targetPath && (
+                <div className="approval-banner-meta">
+                  <span>文件</span>
+                  <code>{preview.targetPath}</code>
+                </div>
+              )}
+              {preview?.overwrite !== undefined && (
+                <div className="approval-banner-meta">
+                  <span>操作</span>
+                  <span>{preview.overwrite ? '覆盖现有文件' : '新建文件'}</span>
+                </div>
+              )}
+              {preview?.contentLength !== undefined && (
+                <div className="approval-banner-meta">
+                  <span>内容</span>
+                  <span>{preview.contentLength} 字符</span>
+                </div>
+              )}
+            </div>
+            <div className="approval-banner-actions">
+              <button
+                type="button"
+                className="approval-banner-reject"
+                onClick={() => onRejectTool(first.approval!.id)}
+              >
+                <X size={16} />
+                拒绝
+              </button>
+              <button
+                type="button"
+                className="approval-banner-approve"
+                onClick={() => onApproveTool(first.approval!.id, first.approval!.argumentsHash)}
+              >
+                <Check size={16} />
+                批准
+              </button>
+            </div>
+          </div>
+        )
+      })()}
       <form className="input-area" onSubmit={handleSubmit}>
         <textarea
           ref={textareaRef}

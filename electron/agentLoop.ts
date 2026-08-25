@@ -47,11 +47,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   }
   if (permissionMode === 'full') {
     systemPrompts.unshift(
-      '当前权限模式为完全访问权限：file_write 无需用户确认，可按用户要求写入任意本地路径；请仍然谨慎确认目标路径和内容。'
+      '当前权限模式为完全访问权限：需要写入或修改文件时直接调用 file_write 工具，无需在回复中询问用户确认，工具会自动执行。'
     )
   } else {
     systemPrompts.unshift(
-      '当前权限模式为请求批准：任何 file_write 操作都必须等待用户批准后才能执行。'
+      '当前权限模式为请求批准：当需要写入或修改文件时，直接调用 file_write 工具，不要在回复中用自然语言询问用户是否确认，系统会自动弹出确认卡片让用户批准或拒绝。'
     )
   }
   const systemPrompt = systemPrompts.join('\n\n')

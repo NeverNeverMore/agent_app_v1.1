@@ -1159,3 +1159,120 @@ input {
 .tool-meta-requirements {
   color: #9a6700;
 }
+/* 审批确认横幅 */
+.approval-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 16px;
+  padding: 12px 16px;
+  border: 1px solid #e2b93b;
+  border-radius: 12px;
+  background: #fffaf0;
+  box-shadow: 0 2px 8px rgba(226, 185, 59, 0.15);
+  animation: approval-pulse 2s ease-in-out infinite;
+}
+
+@keyframes approval-pulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(226, 185, 59, 0.15); }
+  50% { box-shadow: 0 4px 16px rgba(226, 185, 59, 0.35); }
+}
+
+.approval-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fef0d0;
+  color: #9a6700;
+  flex-shrink: 0;
+}
+
+.approval-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.approval-banner-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #9a6700;
+}
+
+.approval-banner-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.approval-banner-meta span:first-child {
+  color: #b08800;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.approval-banner-meta code {
+  color: var(--text);
+  word-break: break-all;
+  font-size: 11px;
+}
+
+.approval-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.approval-banner-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.approval-banner-actions button:hover { opacity: 0.88; }
+.approval-banner-actions button:active { transform: scale(0.97); }
+
+.approval-banner-reject {
+  color: #cf222e;
+  border: 1px solid #e5a4aa;
+  background: #fff;
+}
+
+.approval-banner-approve {
+  color: #fff;
+  border: 1px solid #1a7f37;
+  background: #1a7f37;
+}
+
+@media (max-width: 640px) {
+  .approval-banner {
+    flex-wrap: wrap;
+    margin: 0 8px;
+    padding: 10px 12px;
+  }
+
+  .approval-banner-body {
+    order: 1;
+    flex: 1 1 calc(100% - 48px);
+    min-width: 0;
+  }
+
+  .approval-banner-actions {
+    order: 2;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
