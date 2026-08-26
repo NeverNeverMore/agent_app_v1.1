@@ -1,5 +1,5 @@
 {
-  "name": "kimi-chat-client",
+  "name": "sifang-chat-client",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,12 +10,18 @@
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "preview": "vite preview",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.11.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.400.0",
+    "mammoth": "^1.12.1",
+    "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "lucide-react": "^0.400.0"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

@@ -55,7 +55,7 @@ function App() {
     setProjectFolder,
     setPermissionMode,
   } = useConversations()
-  const { isLoading, sendMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
+  const { isLoading, taskStatus, sendMessage, retryLastMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
     config,
     activeConversation,
     updateConversation,
@@ -128,7 +128,9 @@ function App() {
             <Chat
               messages={activeConversation.messages}
               isLoading={isLoading}
+              taskStatus={taskStatus}
               onSend={sendMessage}
+              onRetry={retryLastMessage}
               onAbort={abortMessage}
               projectFolder={activeConversation.projectFolder}
               onSelectFolder={handleSelectFolder}

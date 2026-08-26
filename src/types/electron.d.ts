@@ -1,7 +1,9 @@
 ﻿import type { ToolStreamEvent } from '../../shared/tools'
 import type { ToolMeta } from '../../shared/tools'
-import type { ApprovalStreamEvent } from '../../shared/approvals'
+import type { ApprovalRequest, ApprovalStreamEvent } from '../../shared/approvals'
 import type { ApiConfig, PermissionMode } from '../../shared/types'
+import type { TaskStatusEvent } from '../../shared/task'
+import type { ChatAttachment } from '../../shared/attachments'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -11,9 +13,14 @@ export interface ElectronAPI {
     projectFolder: string
     permissionMode: PermissionMode
     conversationId: string
+    attachments?: ChatAttachment[]
   }) => void
   abortMessage: (payload: { id: number }) => void
   selectFolder: () => Promise<string | null>
+  selectAttachments: () => Promise<ChatAttachment[]>
+  importAttachments: (filePaths: string[]) => Promise<ChatAttachment[]>
+  getFilePath: (file: File) => string
+  cleanupAttachments: (attachments: ChatAttachment[]) => Promise<{ ok: boolean }>
   listTools: () => Promise<ToolMeta[]>
   approveTool: (payload: {
     approvalId: string
@@ -22,6 +29,7 @@ export interface ElectronAPI {
   rejectTool: (payload: {
     approvalId: string
   }) => Promise<{ ok: boolean; error?: string }>
+  listPendingApprovals: () => Promise<ApprovalRequest[]>
   testApi: (config: ApiConfig) => Promise<{
     ok: boolean
     error?: string
@@ -39,6 +47,7 @@ export interface ElectronAPI {
   onToolEvent: (
     callback: (event: unknown, data: { id: number; event: ToolStreamEvent }) => void
   ) => () => void
+  onTaskStatus: (callback: (event: unknown, data: { id: number; event: TaskStatusEvent }) => void) => () => void
   onApprovalEvent: (
     callback: (
       event: unknown,

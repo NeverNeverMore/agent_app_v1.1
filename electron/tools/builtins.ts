@@ -1,4 +1,4 @@
-﻿import fs from 'node:fs/promises'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { ToolDefinition, ToolResult } from './types'
 
@@ -14,28 +14,12 @@ function fail(code: string, message: string, retryable = false): ToolResult {
 }
 
 /** 安全边界：所有文件路径必须解析在项目文件夹之内 */
-function resolveWithinRoot(projectFolder: string, relativePath: string): string {
-  if (!projectFolder) {
-    throw new Error('未关联项目文件夹，请先在输入框下方选择项目文件夹')
-  }
-  const root = path.resolve(projectFolder)
-  const resolved = path.resolve(root, relativePath || '.')
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-    throw new Error('路径越界：只能访问项目文件夹内的文件')
-  }
-  return resolved
-}
+import { resolveExistingWithinRoot, resolveWriteWithinRoot } from "./pathSecurity"
 
-function resolveWritePath(
-  projectFolder: string,
-  requestedPath: string,
-  allowOutsideRoot: boolean
-): string {
-  if (allowOutsideRoot) {
-    const base = projectFolder || process.cwd()
-    return path.resolve(base, requestedPath)
-  }
-  return resolveWithinRoot(projectFolder, requestedPath)
+async function resolveWithinRoot(projectFolder: string, relativePath: string): Promise<string> { return resolveExistingWithinRoot(projectFolder, relativePath) }
+async function resolveWritePath(projectFolder: string, requestedPath: string, allowOutsideRoot: boolean): Promise<string> {
+  if (allowOutsideRoot) return path.resolve(projectFolder || process.cwd(), requestedPath)
+  return resolveWriteWithinRoot(projectFolder, requestedPath)
 }
 
 /* ---------- time_current ---------- */
@@ -190,7 +174,7 @@ const fileList: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const target = resolveWithinRoot(
+      const target = await resolveWithinRoot(
         context.projectFolder,
         typeof args.path === 'string' ? args.path : '.'
       )
@@ -242,7 +226,7 @@ const fileRead: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const target = resolveWithinRoot(context.projectFolder, String(args.path))
+      const target = await resolveWithinRoot(context.projectFolder, String(args.path))
       const stat = await fs.stat(target)
       if (!stat.isFile()) return fail('FILE_ACCESS_ERROR', '目标路径不是文件')
       const content = await fs.readFile(target, 'utf-8')
@@ -289,7 +273,7 @@ const fileWrite: ToolDefinition = {
     let targetPath = typeof args.path === 'string' ? args.path : ''
     let overwrite = false
     try {
-      const target = resolveWritePath(
+      const target = await resolveWritePath(
         context.projectFolder,
         targetPath,
         context.permissionMode === 'full'
@@ -321,7 +305,7 @@ const fileWrite: ToolDefinition = {
       if (path.isAbsolute(relativePath) && context.permissionMode !== 'full') {
         return fail('FILE_ACCESS_ERROR', '只允许使用相对于项目文件夹的路径')
       }
-      const target = resolveWritePath(
+      const target = await resolveWritePath(
         context.projectFolder,
         relativePath,
         context.permissionMode === 'full'

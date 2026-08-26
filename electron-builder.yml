@@ -1,4 +1,4 @@
-appId: com.sifangshangxing.kimi-chat-client
+appId: com.sifangshangxing.sifang-chat-client
 productName: 四方上行 Chat Client
 directories:
   output: release

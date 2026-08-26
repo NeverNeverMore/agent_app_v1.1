@@ -10,6 +10,8 @@ import { requestModel as requestProtocolModel } from './protocol'
 import type { AgentMessage } from './protocol'
 
 import type { PermissionMode } from '../shared/types'
+import type { TaskStatus, TaskStatusEvent } from '../shared/task'
+import type { ChatAttachment } from '../shared/attachments'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -23,10 +25,12 @@ export interface AgentLoopOptions {
   permissionMode: PermissionMode
   requestId: number
   conversationId: string
+  attachments?: ChatAttachment[]
   signal: AbortSignal
   emitChunk: (content: string) => void
   emitToolEvent: (event: ToolStreamEvent) => void
   emitApproval: (event: ApprovalStreamEvent) => void
+  emitTaskStatus: (event: TaskStatusEvent) => void
 }
 
 const MAX_TOOL_STEPS = 8
@@ -35,6 +39,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   const { config, projectFolder, permissionMode, requestId, conversationId, signal, emitChunk, emitToolEvent, emitApproval } = options
 
   const registry = getToolRegistry()
+  const setStatus = (status: TaskStatus, error?: string) => options.emitTaskStatus({ status, ...(error ? { error } : {}) })
+  setStatus("generating")
   const tools = registry.listExecutable()
 
   const systemPrompts = options.messages
@@ -55,9 +61,19 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     )
   }
   const systemPrompt = systemPrompts.join('\n\n')
+  const attachmentContext = (options.attachments ?? []).map((item) => {
+    if (item.kind === 'image') return `[\u9644\u4ef6\u56fe\u7247] ${item.name}`
+    if (item.parseStatus === 'failed') return `[\u9644\u4ef6\u89e3\u6790\u5931\u8d25] ${item.name}: ${item.error ?? '\u672a\u77e5\u9519\u8bef'}`
+    return `[\u9644\u4ef6: ${item.name}]\n${item.extractedText ?? ''}`
+  }).join('\n\n')
   const messages: AgentMessage[] = options.messages
     .filter((message): message is ChatMessage & { role: 'user' | 'assistant' } => message.role !== 'system')
     .map((message) => ({ role: message.role, content: message.content }))
+  const lastUser = [...messages].reverse().find((message) => message.role === 'user')
+  if (lastUser && attachmentContext) {
+    lastUser.content = `${lastUser.content}\n\n${attachmentContext}`
+    if (options.attachments?.some((item) => item.dataUrl)) lastUser.attachments = options.attachments
+  }
 
   for (let step = 0; ; step++) {
     if (signal.aborted) return
@@ -86,6 +102,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     for (const call of normalizedCalls) {
       if (signal.aborted) return
 
+      setStatus("running_tool")
       emitToolEvent({
         type: 'start',
         callId: call.id,
@@ -124,6 +141,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
             emitApproval({ type: 'update', approvalId: request.id, status }),
         })
         emitApproval({ type: 'request', request })
+        setStatus("waiting_approval")
 
         const approvalStatus = await decision
         if (signal.aborted) {
@@ -185,6 +203,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
       })
 
       messages.push({ role: 'tool', toolCallId: call.id, content: executed.resultMessage })
+      setStatus("generating")
     }
   }
 }

@@ -4,11 +4,15 @@ import type { Message } from '../types/chat'
 import { MessageItem } from './Message'
 import { MODEL_DISPLAY_NAME } from '../../shared/config'
 import type { PermissionMode } from '../../shared/types'
+import type { TaskStatus } from '../../shared/task'
+import type { ChatAttachment } from '../../shared/attachments'
 
 interface ChatProps {
   messages: Message[]
   isLoading: boolean
-  onSend: (content: string) => void
+  taskStatus: TaskStatus
+  onSend: (content: string, attachments?: ChatAttachment[]) => void
+  onRetry: () => void
   onAbort: () => void
   projectFolder: string
   onSelectFolder: () => void
@@ -21,7 +25,9 @@ interface ChatProps {
 export function Chat({
   messages,
   isLoading,
+  taskStatus,
   onSend,
+  onRetry,
   onAbort,
   projectFolder,
   onSelectFolder,
@@ -31,6 +37,10 @@ export function Chat({
   onRejectTool,
 }: ChatProps) {
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const [attachmentError, setAttachmentError] = useState('')
+  const [isDragActive, setIsDragActive] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [thinkingSeconds, setThinkingSeconds] = useState(0)
   const [isPermissionMenuOpen, setIsPermissionMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -99,11 +109,88 @@ export function Chat({
   ]
   const selectedPermission = permissionOptions.find((option) => option.value === permissionMode) ?? permissionOptions[0]
 
+  const addAttachments = async (importer: () => Promise<ChatAttachment[]>) => {
+    if (isLoading || !window.electronAPI) return
+    setAttachmentError('')
+    try {
+      const imported = await importer()
+      setAttachments((current) => [...current, ...imported].slice(0, 5))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('附件上传失败', error)
+      setAttachmentError(message || '附件上传失败，请重试')
+    }
+  }
+
+  const handleSelectAttachments = () => {
+    void addAttachments(() => window.electronAPI!.selectAttachments())
+  }
+
+  const importDroppedFiles = (files: File[]) => {
+    if (isLoading || !window.electronAPI) return
+    const paths = files.map((file) => {
+      try {
+        return window.electronAPI.getFilePath(file) || (file as File & { path?: string }).path || ''
+      } catch {
+        return (file as File & { path?: string }).path || ''
+      }
+    }).filter(Boolean)
+    if (!paths.length) {
+      setAttachmentError('无法读取拖入文件，请使用本地文件或点击回形针选择')
+      return
+    }
+    void addAttachments(() => window.electronAPI!.importAttachments(paths))
+  }
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'copy'
+    if (!isLoading) setIsDragActive(true)
+  }
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault()
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsDragActive(false)
+  }
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragActive(false)
+    importDroppedFiles(Array.from(event.dataTransfer.files))
+  }
+
+  useEffect(() => {
+    const preventWindowFileDrop = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+    }
+    const handleWindowDrop = (event: DragEvent) => {
+      if (!event.dataTransfer?.files.length || isLoading) return
+      event.preventDefault()
+      event.stopPropagation()
+      setIsDragActive(false)
+      importDroppedFiles(Array.from(event.dataTransfer.files))
+    }
+    window.addEventListener('dragover', preventWindowFileDrop, true)
+    window.addEventListener('drop', handleWindowDrop, true)
+    return () => {
+      window.removeEventListener('dragover', preventWindowFileDrop, true)
+      window.removeEventListener('drop', handleWindowDrop, true)
+    }
+  }, [isLoading])
+  const removeAttachment = (attachment: ChatAttachment) => {
+    setAttachments((current) => current.filter((item) => item.id !== attachment.id))
+    void window.electronAPI?.cleanupAttachments([attachment])
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
-    onSend(input)
+    if ((!input.trim() && attachments.length === 0) || isLoading) return
+    onSend(input, attachments)
     setInput('')
+    setAttachments([])
+    setAttachmentError('')
     const textarea = textareaRef.current
     if (textarea) textarea.style.height = 'auto'
   }
@@ -116,7 +203,7 @@ export function Chat({
   }
 
   return (
-    <div className="chat-container">
+    <div className={`chat-container${isDragActive ? ' drag-over' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome">
@@ -130,7 +217,13 @@ export function Chat({
         {isLoading && (
           <div className="thinking-status" role="status" aria-live="polite">
             <Loader2 size={16} className="spin" />
-            <span>思考中... {thinkingSeconds}秒</span>
+            <span>{taskStatus === 'waiting_approval' ? '等待用户确认' : taskStatus === 'running_tool' ? '正在执行工具' : '思考中'}... {thinkingSeconds}秒</span>
+          </div>
+        )}
+        {!isLoading && taskStatus === 'failed' && (
+          <div className="task-recovery" role="alert">
+            <span>任务执行失败，可以重试。</span>
+            <button type="button" onClick={onRetry}>??</button>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -191,7 +284,20 @@ export function Chat({
           </div>
         )
       })()}
+      {attachments.length > 0 && (
+        <div className="attachment-list" aria-label={'\u5f85\u53d1\u9001\u9644\u4ef6'}>
+          {attachments.map((attachment) => (
+            <div className="attachment-chip" key={attachment.id}>
+              <span className="attachment-chip-name" title={attachment.name}>{attachment.name}</span>
+              <span className="attachment-chip-size">{(attachment.size / 1024 / 1024).toFixed(1)}MB</span>
+              <button type="button" onClick={() => removeAttachment(attachment)} disabled={isLoading} aria-label={`\u5220\u9664\u9644\u4ef6 ${attachment.name}`}>&times;</button>
+            </div>
+          ))}
+        </div>
+      )}
       <form className="input-area" onSubmit={handleSubmit}>
+        <input ref={fileInputRef} type="file" multiple hidden />
+        <button type="button" className="attachment-button" onClick={handleSelectAttachments} disabled={isLoading} aria-label="添加附件" title="添加附件">📎</button>
         <textarea
           ref={textareaRef}
           value={input}
@@ -206,11 +312,12 @@ export function Chat({
           onClick={isLoading ? onAbort : undefined}
           className={isLoading ? 'abort' : 'send'}
           aria-label={isLoading ? '停止生成' : '发送'}
-          disabled={!isLoading && !input.trim()}
+          disabled={!isLoading && !input.trim() && attachments.length === 0}
         >
           {isLoading ? <Square size={20} /> : <Send size={20} />}
         </button>
       </form>
+      {attachmentError && <div className="attachment-error" role="alert">{attachmentError}</div>}
       <div className="project-folder-bar">
         <button
           type="button"

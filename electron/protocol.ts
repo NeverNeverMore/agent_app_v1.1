@@ -1,4 +1,5 @@
 import type { ApiConfig } from '../shared/types'
+import type { ChatAttachment } from '../shared/attachments'
 import type { ToolInputSchema, ToolDefinition } from './tools/types'
 
 export interface AgentToolCall {
@@ -8,7 +9,7 @@ export interface AgentToolCall {
 }
 
 export type AgentMessage =
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string; attachments?: ChatAttachment[] }
   | { role: 'assistant'; content: string | null; toolCalls?: AgentToolCall[] }
   | { role: 'tool'; toolCallId: string; content: string }
 
@@ -38,23 +39,16 @@ function toOpenAIMessages(system: string, messages: AgentMessage[]) {
   return [
     ...(system ? [{ role: 'system', content: system }] : []),
     ...messages.map((message) => {
-      if (message.role === 'tool') {
-        return {
-          role: 'tool',
-          tool_call_id: message.toolCallId,
-          content: message.content,
-        }
+      if (message.role === 'tool') return { role: 'tool', tool_call_id: message.toolCallId, content: message.content }
+      if (message.role === 'assistant' && message.toolCalls?.length) return {
+        role: 'assistant', content: message.content,
+        tool_calls: message.toolCalls.map((call) => ({ id: call.id, type: 'function', function: { name: call.name, arguments: call.arguments || '{}' } })),
       }
-      if (message.role === 'assistant' && message.toolCalls?.length) {
-        return {
-          role: 'assistant',
-          content: message.content,
-          tool_calls: message.toolCalls.map((call) => ({
-            id: call.id,
-            type: 'function',
-            function: { name: call.name, arguments: call.arguments || '{}' },
-          })),
-        }
+      if (message.role === 'user' && message.attachments?.some((item) => item.dataUrl)) return {
+        role: 'user', content: [
+          { type: 'text', text: message.content },
+          ...message.attachments.filter((item) => item.dataUrl).map((item) => ({ type: 'image_url', image_url: { url: item.dataUrl } })),
+        ],
       }
       return { role: message.role, content: message.content }
     }),
@@ -82,6 +76,12 @@ function toAnthropicMessages(messages: AgentMessage[]) {
           })),
         ],
       }
+    }
+    if (message.role === 'user' && message.attachments?.some((item) => item.dataUrl)) {
+      return { role: 'user', content: [
+        { type: 'text', text: message.content },
+        ...message.attachments.filter((item) => item.dataUrl).map((item) => ({ type: 'image', source: { type: 'base64', media_type: item.mimeType, data: item.dataUrl!.split(',')[1] } })),
+      ] }
     }
     return { role: message.role, content: message.content }
   })
