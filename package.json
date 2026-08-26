@@ -11,7 +11,7 @@
     "dist:win": "npm run build && electron-builder --win",
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts && node scripts/check-encoding.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "^5.11.0",
