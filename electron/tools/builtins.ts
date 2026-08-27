@@ -328,6 +328,100 @@ const fileWrite: ToolDefinition = {
   },
 }
 
+
+/* ---------- http_fetch ---------- */
+const MAX_RESPONSE_CHARS = 20_000
+const HTTP_FETCH_MAX_ATTEMPTS = 3
+const HTTP_FETCH_RETRY_DELAY_MS = 500
+
+function shouldRetryHttpStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
+}
+
+const httpFetch: ToolDefinition = {
+  name: 'http_fetch',
+  displayName: 'HTTP 请求',
+  description: '通过 HTTP/HTTPS 获取指定 URL 的内容，仅使用 GET 请求，返回状态码、响应头和文本或 JSON 响应体。网络异常会自动重试。',
+  permission: 'read',
+  source: 'builtin',
+  category: '网络',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'Full URL to request, e.g. https://api.example.com/data' },
+      headers: {
+        type: 'object',
+        description: '可选的请求头键值对，例如 {"Accept": "application/json"}',
+        additionalProperties: { type: 'string' },
+      },
+    },
+    required: ['url'],
+  },
+  execute: async (args, context) => {
+    const rawUrl = String(args.url ?? '')
+    let url: URL
+    try {
+      url = new URL(rawUrl)
+    } catch {
+      return fail('INVALID_URL', `无效的 URL: ${rawUrl}`)
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return fail('INVALID_URL', `仅支持 http: 和 https: 协议，当前为 ${url.protocol}`)
+    }
+    const headers = (args.headers as Record<string, string> | undefined) ?? {}
+
+    for (let attempt = 1; attempt <= HTTP_FETCH_MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await fetch(rawUrl, { headers, signal: context.signal })
+        if (shouldRetryHttpStatus(response.status) && attempt < HTTP_FETCH_MAX_ATTEMPTS) {
+          await response.body?.cancel()
+          await new Promise((resolve) => setTimeout(resolve, HTTP_FETCH_RETRY_DELAY_MS * attempt))
+          continue
+        }
+      const text = await response.text()
+      const truncated = text.length > MAX_RESPONSE_CHARS
+      const bodyText = truncated ? text.slice(0, MAX_RESPONSE_CHARS) : text
+      let parsedBody: unknown = bodyText
+      const contentType = response.headers.get('content-type') ?? ''
+      if (contentType.includes('application/json')) {
+        try {
+          parsedBody = JSON.parse(bodyText)
+        } catch {
+          // fallback to text
+        }
+      }
+      const headerMap: Record<string, string> = {}
+      response.headers.forEach((value, key) => {
+        headerMap[key] = value
+      })
+      return ok({
+        url: rawUrl,
+        method: 'GET',
+        attempts: attempt,
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        headers: headerMap,
+        truncated,
+        body: parsedBody,
+      })
+      } catch (error) {
+        if (context.signal.aborted) {
+          return fail('TOOL_ABORTED', 'HTTP 请求已被用户停止')
+        }
+        if (attempt === HTTP_FETCH_MAX_ATTEMPTS) {
+          return fail(
+            'NETWORK_ERROR',
+            error instanceof Error ? error.message : String(error),
+            true
+          )
+        }
+        await new Promise((resolve) => setTimeout(resolve, HTTP_FETCH_RETRY_DELAY_MS * attempt))
+      }
+    }
+    return fail('NETWORK_ERROR', 'HTTP 请求未完成', true)
+  },
+}
 export function createBuiltinTools(): ToolDefinition[] {
-  return [timeCurrent, calculator, fileList, fileRead, fileWrite]
+  return [timeCurrent, calculator, fileList, fileRead, fileWrite, httpFetch]
 }
