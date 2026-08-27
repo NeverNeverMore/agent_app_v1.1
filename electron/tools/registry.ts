@@ -1,4 +1,4 @@
-﻿import type { OpenAIToolDefinition, ToolDefinition } from './types'
+import type { OpenAIToolDefinition, ToolDefinition } from './types'
 
 import type { ToolMeta } from '../../shared/tools'
 
@@ -13,6 +13,10 @@ export class ToolRegistry {
       throw new Error(`Duplicate tool: ${tool.name}`)
     }
     this.tools.set(tool.name, tool)
+  }
+
+  unregister(name: string): void {
+    this.tools.delete(name)
   }
 
   get(name: string): ToolDefinition | undefined {

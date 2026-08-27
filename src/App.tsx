@@ -5,6 +5,7 @@ import { ConfirmDialog } from './components/ConfirmDialog'
 import { SettingsDrawer } from './components/Settings'
 import { Sidebar } from './components/Sidebar'
 import { ToolList } from './components/ToolList'
+import { McpManager } from './components/McpManager'
 import { useChat } from './hooks/useChat'
 import { useApiConfig } from './hooks/useApiConfig'
 import { useConversations } from './hooks/useConversations'
@@ -141,6 +142,8 @@ function App() {
             />
           ) : activeSection === 'tools' ? (
             <ToolList />
+          ) : activeSection === 'mcp' ? (
+            <McpManager />
           ) : (
             <PlaceholderPanel section={activeSection} />
           )}

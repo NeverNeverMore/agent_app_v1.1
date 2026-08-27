@@ -14,6 +14,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts && node scripts/check-encoding.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "fast-xml-parser": "^5.11.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.400.0",

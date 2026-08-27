@@ -1341,3 +1341,35 @@ input {
 }
 .attachment-button:hover:not(:disabled) { background: #f3f4f6 !important; }
 .chat-container.drag-over { outline: 2px dashed #8b5cf6; outline-offset: -8px; }
+
+.mcp-panel { padding: 28px; max-width: 960px; margin: 0 auto; }
+.mcp-panel-header, .mcp-form-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.mcp-panel-header h2, .mcp-form h3 { margin: 0; color: var(--text); }
+.mcp-panel-header p { margin: 6px 0 0; color: var(--text-secondary); font-size: 13px; }
+.mcp-config-path { margin: 8px 0 0; max-width: 680px; overflow-wrap: anywhere; color: var(--text-secondary); font-size: 12px; }
+.mcp-config-path code { color: var(--text); font-size: 12px; }
+.mcp-panel-actions { display: flex; gap: 8px; }
+.secondary-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d9dce3; border-radius: 7px; padding: 9px 14px; background: #fff; color: var(--text); cursor: pointer; font-size: 13px; }
+.primary-button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; padding: 9px 14px; background: #2563eb; color: #fff; cursor: pointer; font-size: 13px; }
+.mcp-error { margin: 18px 0; padding: 10px 12px; border: 1px solid #f0b4b4; border-radius: 7px; background: #fff5f5; color: #b42318; font-size: 13px; }
+.mcp-server-list { display: grid; gap: 12px; margin-top: 22px; }
+.mcp-server-card { padding: 16px; border: 1px solid #d9dce3; border-radius: 8px; background: #fff; }
+.mcp-server-main { display: flex; align-items: flex-start; gap: 10px; }
+.mcp-server-main strong { display: block; color: var(--text); }
+.mcp-server-main code { display: block; margin-top: 5px; color: var(--text-secondary); font-size: 11px; word-break: break-all; }
+.mcp-status { display: flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--text-secondary); font-size: 12px; }
+.mcp-status span { width: 7px; height: 7px; border-radius: 50%; background: #9ca3af; }
+.mcp-status.connected span { background: #16a34a; }.mcp-status.error span { background: #dc2626; }.mcp-status.connecting span { background: #d97706; }
+.mcp-server-error { margin: 10px 0 0; color: #b42318; font-size: 12px; word-break: break-word; }
+.mcp-server-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.mcp-server-actions button, .mcp-form-actions button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #d9dce3; border-radius: 6px; padding: 6px 10px; background: #fff; color: var(--text); cursor: pointer; font-size: 12px; }
+.mcp-server-actions .danger-button { color: #b42318; }
+.mcp-form-overlay { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: center; align-items: flex-start; padding: 8vh 20px; background: rgba(15, 23, 42, .28); }
+.mcp-form { width: min(520px, 100%); padding: 22px; border-radius: 9px; background: #fff; box-shadow: 0 16px 40px rgba(15, 23, 42, .18); }
+.mcp-form > label { display: block; margin-top: 16px; color: var(--text); font-size: 13px; }
+.mcp-form input:not([type="checkbox"]), .mcp-form textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 9px 10px; border: 1px solid #d9dce3; border-radius: 6px; font: inherit; font-size: 13px; }
+.mcp-form textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.mcp-json-help { margin: 10px 0; color: var(--text-secondary); font-size: 12px; }
+.mcp-json-editor { min-height: 360px; font-size: 12px !important; line-height: 1.5; }
+.mcp-checkbox { display: flex !important; align-items: center; gap: 7px; }.mcp-checkbox input { margin: 0; }
+.mcp-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }

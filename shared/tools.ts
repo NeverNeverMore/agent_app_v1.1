@@ -1,8 +1,8 @@
-﻿export type ToolPermission = 'read' | 'write' | 'dangerous'
+export type ToolPermission = 'read' | 'write' | 'dangerous'
 
 import type { ApprovalPreview, ApprovalStatus } from './approvals'
 
-export type ToolSource = 'builtin'
+export type ToolSource = 'builtin' | 'mcp'
 
 /** 工具列表页展示的元数据（由主进程注册表动态生成） */
 export interface ToolMeta {

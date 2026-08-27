@@ -15,6 +15,8 @@ import {
 import { runAgentLoop } from './agentLoop'
 import { getToolRegistry } from './tools'
 import { protocolEndpoint } from './protocol'
+import { McpManager } from './mcp'
+import type { McpServerConfig } from '../shared/mcp'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -71,6 +73,7 @@ function createApplicationMenu() {
 
 let mainWindow: BrowserWindow | null = null
 const abortControllers = new Map<number, AbortController>()
+const mcpManager = new McpManager()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -100,6 +103,7 @@ function createWindow() {
 app.whenReady().then(() => {
   configureApprovalStore(path.join(app.getPath('userData'), 'pending-approvals.json'))
   void cleanupOldAttachments(app.getPath('temp'))
+  void mcpManager.initialize(app.getPath('userData'), getToolRegistry())
   createWindow()
   createApplicationMenu()
 })
@@ -253,3 +257,21 @@ ipcMain.handle('select-folder', async () => {
 })
 
 ipcMain.handle('list-tools', () => getToolRegistry().listMeta())
+
+ipcMain.handle('list-mcp-servers', () => mcpManager.list())
+ipcMain.handle('get-mcp-config-json', () => mcpManager.getConfigJson())
+ipcMain.handle('get-mcp-config-path', () => mcpManager.getConfigPath())
+ipcMain.handle('save-mcp-config-json', (_event, raw: string) => mcpManager.replaceFromJson(raw, getToolRegistry()))
+ipcMain.handle('save-mcp-server', (_event, input: Omit<McpServerConfig, 'id'> & { id?: string }) =>
+  mcpManager.upsert(input, getToolRegistry())
+)
+ipcMain.handle('delete-mcp-server', (_event, id: string) =>
+  mcpManager.remove(id, getToolRegistry()).then(() => ({ ok: true }))
+)
+ipcMain.handle('set-mcp-server-enabled', (_event, payload: { id: string; enabled: boolean }) =>
+  mcpManager.setEnabled(payload.id, payload.enabled, getToolRegistry())
+)
+ipcMain.handle('reconnect-mcp-server', (_event, id: string) =>
+  mcpManager.reconnect(id, getToolRegistry())
+)
+mcpManager.setListener((event) => mainWindow?.webContents.send('mcp-server-event', event))

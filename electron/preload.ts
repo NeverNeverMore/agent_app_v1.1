@@ -1,9 +1,10 @@
-﻿import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import type { ToolMeta, ToolStreamEvent } from '../shared/tools'
 import type { ApprovalRequest, ApprovalStreamEvent } from '../shared/approvals'
 import type { ApiConfig, PermissionMode } from '../shared/types'
 import type { TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
+import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../shared/mcp'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -22,6 +23,14 @@ export interface ElectronAPI {
   getFilePath: (file: File) => string
   cleanupAttachments: (attachments: ChatAttachment[]) => Promise<{ ok: boolean }>
   listTools: () => Promise<ToolMeta[]>
+  listMcpServers: () => Promise<McpServerInfo[]>
+  getMcpConfigJson: () => Promise<string>
+  getMcpConfigPath: () => Promise<string>
+  saveMcpConfigJson: (raw: string) => Promise<McpServerInfo[]>
+  saveMcpServer: (input: Omit<McpServerConfig, 'id'> & { id?: string }) => Promise<McpServerInfo>
+  deleteMcpServer: (id: string) => Promise<{ ok: boolean }>
+  setMcpServerEnabled: (payload: { id: string; enabled: boolean }) => Promise<McpServerInfo>
+  reconnectMcpServer: (id: string) => Promise<McpServerInfo>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string
@@ -57,6 +66,7 @@ export interface ElectronAPI {
       data: { id: number; event: ApprovalStreamEvent }
     ) => void
   ) => () => void
+  onMcpServerEvent: (callback: (event: IpcRendererEvent, data: McpServerEvent) => void) => () => void
 }
 
 const api: ElectronAPI = {
@@ -68,6 +78,14 @@ const api: ElectronAPI = {
   getFilePath: (file) => webUtils.getPathForFile(file),
   cleanupAttachments: (attachments) => ipcRenderer.invoke('cleanup-attachments', attachments),
   listTools: () => ipcRenderer.invoke('list-tools'),
+  listMcpServers: () => ipcRenderer.invoke('list-mcp-servers'),
+  getMcpConfigJson: () => ipcRenderer.invoke('get-mcp-config-json'),
+  getMcpConfigPath: () => ipcRenderer.invoke('get-mcp-config-path'),
+  saveMcpConfigJson: (raw) => ipcRenderer.invoke('save-mcp-config-json', raw),
+  saveMcpServer: (input) => ipcRenderer.invoke('save-mcp-server', input),
+  deleteMcpServer: (id) => ipcRenderer.invoke('delete-mcp-server', id),
+  setMcpServerEnabled: (payload) => ipcRenderer.invoke('set-mcp-server-enabled', payload),
+  reconnectMcpServer: (id) => ipcRenderer.invoke('reconnect-mcp-server', id),
   approveTool: (payload) => ipcRenderer.invoke('approve-tool', payload),
   rejectTool: (payload) => ipcRenderer.invoke('reject-tool', payload),
   listPendingApprovals: () => ipcRenderer.invoke('list-pending-approvals'),
@@ -112,7 +130,11 @@ const api: ElectronAPI = {
     ipcRenderer.on('approval-event', handler)
     return () => ipcRenderer.removeListener('approval-event', handler)
   },
+  onMcpServerEvent: (callback) => {
+    const handler = (_event: IpcRendererEvent, data: McpServerEvent) => callback(_event, data)
+    ipcRenderer.on('mcp-server-event', handler)
+    return () => ipcRenderer.removeListener('mcp-server-event', handler)
+  },
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)
-

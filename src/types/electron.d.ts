@@ -1,9 +1,10 @@
-﻿import type { ToolStreamEvent } from '../../shared/tools'
+import type { ToolStreamEvent } from '../../shared/tools'
 import type { ToolMeta } from '../../shared/tools'
 import type { ApprovalRequest, ApprovalStreamEvent } from '../../shared/approvals'
 import type { ApiConfig, PermissionMode } from '../../shared/types'
 import type { TaskStatusEvent } from '../../shared/task'
 import type { ChatAttachment } from '../../shared/attachments'
+import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../../shared/mcp'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -22,6 +23,14 @@ export interface ElectronAPI {
   getFilePath: (file: File) => string
   cleanupAttachments: (attachments: ChatAttachment[]) => Promise<{ ok: boolean }>
   listTools: () => Promise<ToolMeta[]>
+  listMcpServers: () => Promise<McpServerInfo[]>
+  getMcpConfigJson: () => Promise<string>
+  getMcpConfigPath: () => Promise<string>
+  saveMcpConfigJson: (raw: string) => Promise<McpServerInfo[]>
+  saveMcpServer: (input: Omit<McpServerConfig, 'id'> & { id?: string }) => Promise<McpServerInfo>
+  deleteMcpServer: (id: string) => Promise<{ ok: boolean }>
+  setMcpServerEnabled: (payload: { id: string; enabled: boolean }) => Promise<McpServerInfo>
+  reconnectMcpServer: (id: string) => Promise<McpServerInfo>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string
@@ -54,6 +63,7 @@ export interface ElectronAPI {
       data: { id: number; event: ApprovalStreamEvent }
     ) => void
   ) => () => void
+  onMcpServerEvent: (callback: (event: unknown, data: McpServerEvent) => void) => () => void
 }
 
 declare global {
