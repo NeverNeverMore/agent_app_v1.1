@@ -1,0 +1,3 @@
+# 项目源码统一使用 UTF-8，Git 在索引中使用 UTF-8 存储。
+# 不强制换行符转换，避免现有 CRLF/LF 混用文件产生一次性 diff。
+* -text working-tree-encoding=UTF-8

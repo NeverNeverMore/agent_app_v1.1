@@ -1,4 +1,4 @@
-﻿import fs from 'node:fs/promises'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { ToolDefinition, ToolResult } from './types'
 
@@ -14,28 +14,12 @@ function fail(code: string, message: string, retryable = false): ToolResult {
 }
 
 /** 安全边界：所有文件路径必须解析在项目文件夹之内 */
-function resolveWithinRoot(projectFolder: string, relativePath: string): string {
-  if (!projectFolder) {
-    throw new Error('未关联项目文件夹，请先在输入框下方选择项目文件夹')
-  }
-  const root = path.resolve(projectFolder)
-  const resolved = path.resolve(root, relativePath || '.')
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-    throw new Error('路径越界：只能访问项目文件夹内的文件')
-  }
-  return resolved
-}
+import { resolveExistingWithinRoot, resolveWriteWithinRoot } from "./pathSecurity"
 
-function resolveWritePath(
-  projectFolder: string,
-  requestedPath: string,
-  allowOutsideRoot: boolean
-): string {
-  if (allowOutsideRoot) {
-    const base = projectFolder || process.cwd()
-    return path.resolve(base, requestedPath)
-  }
-  return resolveWithinRoot(projectFolder, requestedPath)
+async function resolveWithinRoot(projectFolder: string, relativePath: string): Promise<string> { return resolveExistingWithinRoot(projectFolder, relativePath) }
+async function resolveWritePath(projectFolder: string, requestedPath: string, allowOutsideRoot: boolean): Promise<string> {
+  if (allowOutsideRoot) return path.resolve(projectFolder || process.cwd(), requestedPath)
+  return resolveWriteWithinRoot(projectFolder, requestedPath)
 }
 
 /* ---------- time_current ---------- */
@@ -190,7 +174,7 @@ const fileList: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const target = resolveWithinRoot(
+      const target = await resolveWithinRoot(
         context.projectFolder,
         typeof args.path === 'string' ? args.path : '.'
       )
@@ -242,7 +226,7 @@ const fileRead: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const target = resolveWithinRoot(context.projectFolder, String(args.path))
+      const target = await resolveWithinRoot(context.projectFolder, String(args.path))
       const stat = await fs.stat(target)
       if (!stat.isFile()) return fail('FILE_ACCESS_ERROR', '目标路径不是文件')
       const content = await fs.readFile(target, 'utf-8')
@@ -289,7 +273,7 @@ const fileWrite: ToolDefinition = {
     let targetPath = typeof args.path === 'string' ? args.path : ''
     let overwrite = false
     try {
-      const target = resolveWritePath(
+      const target = await resolveWritePath(
         context.projectFolder,
         targetPath,
         context.permissionMode === 'full'
@@ -321,7 +305,7 @@ const fileWrite: ToolDefinition = {
       if (path.isAbsolute(relativePath) && context.permissionMode !== 'full') {
         return fail('FILE_ACCESS_ERROR', '只允许使用相对于项目文件夹的路径')
       }
-      const target = resolveWritePath(
+      const target = await resolveWritePath(
         context.projectFolder,
         relativePath,
         context.permissionMode === 'full'
@@ -344,6 +328,100 @@ const fileWrite: ToolDefinition = {
   },
 }
 
+
+/* ---------- http_fetch ---------- */
+const MAX_RESPONSE_CHARS = 20_000
+const HTTP_FETCH_MAX_ATTEMPTS = 3
+const HTTP_FETCH_RETRY_DELAY_MS = 500
+
+function shouldRetryHttpStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
+}
+
+const httpFetch: ToolDefinition = {
+  name: 'http_fetch',
+  displayName: 'HTTP 请求',
+  description: '通过 HTTP/HTTPS 获取指定 URL 的内容，仅使用 GET 请求，返回状态码、响应头和文本或 JSON 响应体。网络异常会自动重试。',
+  permission: 'read',
+  source: 'builtin',
+  category: '网络',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'Full URL to request, e.g. https://api.example.com/data' },
+      headers: {
+        type: 'object',
+        description: '可选的请求头键值对，例如 {"Accept": "application/json"}',
+        additionalProperties: { type: 'string' },
+      },
+    },
+    required: ['url'],
+  },
+  execute: async (args, context) => {
+    const rawUrl = String(args.url ?? '')
+    let url: URL
+    try {
+      url = new URL(rawUrl)
+    } catch {
+      return fail('INVALID_URL', `无效的 URL: ${rawUrl}`)
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return fail('INVALID_URL', `仅支持 http: 和 https: 协议，当前为 ${url.protocol}`)
+    }
+    const headers = (args.headers as Record<string, string> | undefined) ?? {}
+
+    for (let attempt = 1; attempt <= HTTP_FETCH_MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await fetch(rawUrl, { headers, signal: context.signal })
+        if (shouldRetryHttpStatus(response.status) && attempt < HTTP_FETCH_MAX_ATTEMPTS) {
+          await response.body?.cancel()
+          await new Promise((resolve) => setTimeout(resolve, HTTP_FETCH_RETRY_DELAY_MS * attempt))
+          continue
+        }
+      const text = await response.text()
+      const truncated = text.length > MAX_RESPONSE_CHARS
+      const bodyText = truncated ? text.slice(0, MAX_RESPONSE_CHARS) : text
+      let parsedBody: unknown = bodyText
+      const contentType = response.headers.get('content-type') ?? ''
+      if (contentType.includes('application/json')) {
+        try {
+          parsedBody = JSON.parse(bodyText)
+        } catch {
+          // fallback to text
+        }
+      }
+      const headerMap: Record<string, string> = {}
+      response.headers.forEach((value, key) => {
+        headerMap[key] = value
+      })
+      return ok({
+        url: rawUrl,
+        method: 'GET',
+        attempts: attempt,
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        headers: headerMap,
+        truncated,
+        body: parsedBody,
+      })
+      } catch (error) {
+        if (context.signal.aborted) {
+          return fail('TOOL_ABORTED', 'HTTP 请求已被用户停止')
+        }
+        if (attempt === HTTP_FETCH_MAX_ATTEMPTS) {
+          return fail(
+            'NETWORK_ERROR',
+            error instanceof Error ? error.message : String(error),
+            true
+          )
+        }
+        await new Promise((resolve) => setTimeout(resolve, HTTP_FETCH_RETRY_DELAY_MS * attempt))
+      }
+    }
+    return fail('NETWORK_ERROR', 'HTTP 请求未完成', true)
+  },
+}
 export function createBuiltinTools(): ToolDefinition[] {
-  return [timeCurrent, calculator, fileList, fileRead, fileWrite]
+  return [timeCurrent, calculator, fileList, fileRead, fileWrite, httpFetch]
 }

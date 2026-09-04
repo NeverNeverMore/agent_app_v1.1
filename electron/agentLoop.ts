@@ -10,6 +10,9 @@ import { requestModel as requestProtocolModel } from './protocol'
 import type { AgentMessage } from './protocol'
 
 import type { PermissionMode } from '../shared/types'
+import type { TaskStatus, TaskStatusEvent } from '../shared/task'
+import type { ChatAttachment } from '../shared/attachments'
+import { skillManager, withSkillPrompt } from './skills'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -23,10 +26,13 @@ export interface AgentLoopOptions {
   permissionMode: PermissionMode
   requestId: number
   conversationId: string
+  attachments?: ChatAttachment[]
+  enabledSkillIds?: string[]
   signal: AbortSignal
   emitChunk: (content: string) => void
   emitToolEvent: (event: ToolStreamEvent) => void
   emitApproval: (event: ApprovalStreamEvent) => void
+  emitTaskStatus: (event: TaskStatusEvent) => void
 }
 
 const MAX_TOOL_STEPS = 8
@@ -35,6 +41,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   const { config, projectFolder, permissionMode, requestId, conversationId, signal, emitChunk, emitToolEvent, emitApproval } = options
 
   const registry = getToolRegistry()
+  const setStatus = (status: TaskStatus, error?: string) => options.emitTaskStatus({ status, ...(error ? { error } : {}) })
+  setStatus("generating")
   const tools = registry.listExecutable()
 
   const systemPrompts = options.messages
@@ -47,17 +55,29 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   }
   if (permissionMode === 'full') {
     systemPrompts.unshift(
-      '当前权限模式为完全访问权限：file_write 无需用户确认，可按用户要求写入任意本地路径；请仍然谨慎确认目标路径和内容。'
+      '当前权限模式为完全访问权限：需要写入或修改文件时直接调用 file_write 工具，无需在回复中询问用户确认，工具会自动执行。'
     )
   } else {
     systemPrompts.unshift(
-      '当前权限模式为请求批准：任何 file_write 操作都必须等待用户批准后才能执行。'
+      '当前权限模式为请求批准：当需要写入或修改文件时，直接调用 file_write 工具，不要在回复中用自然语言询问用户是否确认，系统会自动弹出确认卡片让用户批准或拒绝。'
     )
   }
   const systemPrompt = systemPrompts.join('\n\n')
+  const skillPrompt = await skillManager.prompts(options.enabledSkillIds ?? [], projectFolder)
+  const fullSystemPrompt = withSkillPrompt(systemPrompt, skillPrompt)
+  const attachmentContext = (options.attachments ?? []).map((item) => {
+    if (item.kind === 'image') return `[\u9644\u4ef6\u56fe\u7247] ${item.name}`
+    if (item.parseStatus === 'failed') return `[\u9644\u4ef6\u89e3\u6790\u5931\u8d25] ${item.name}: ${item.error ?? '\u672a\u77e5\u9519\u8bef'}`
+    return `[\u9644\u4ef6: ${item.name}]\n${item.extractedText ?? ''}`
+  }).join('\n\n')
   const messages: AgentMessage[] = options.messages
     .filter((message): message is ChatMessage & { role: 'user' | 'assistant' } => message.role !== 'system')
     .map((message) => ({ role: message.role, content: message.content }))
+  const lastUser = [...messages].reverse().find((message) => message.role === 'user')
+  if (lastUser && attachmentContext) {
+    lastUser.content = `${lastUser.content}\n\n${attachmentContext}`
+    if (options.attachments?.some((item) => item.dataUrl)) lastUser.attachments = options.attachments
+  }
 
   for (let step = 0; ; step++) {
     if (signal.aborted) return
@@ -66,7 +86,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     const isLastStep = step >= MAX_TOOL_STEPS
 
     const result = await requestProtocolModel(
-      config, systemPrompt, messages, tools, isLastStep, signal, emitChunk
+      config, fullSystemPrompt, messages, tools, isLastStep, signal, emitChunk
     )
 
     const calls = result.toolCalls.filter((call) => call.name)
@@ -86,6 +106,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     for (const call of normalizedCalls) {
       if (signal.aborted) return
 
+      setStatus("running_tool")
       emitToolEvent({
         type: 'start',
         callId: call.id,
@@ -124,6 +145,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
             emitApproval({ type: 'update', approvalId: request.id, status }),
         })
         emitApproval({ type: 'request', request })
+        setStatus("waiting_approval")
 
         const approvalStatus = await decision
         if (signal.aborted) {
@@ -185,6 +207,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
       })
 
       messages.push({ role: 'tool', toolCallId: call.id, content: executed.resultMessage })
+      setStatus("generating")
     }
   }
 }

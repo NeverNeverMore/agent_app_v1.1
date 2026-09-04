@@ -3,6 +3,8 @@ import type { ApiConfig } from '../../shared/types'
 import type { Conversation, Message } from '../types/chat'
 import type { ToolStreamEvent } from '../../shared/tools'
 import type { ApprovalStreamEvent } from '../../shared/approvals'
+import type { TaskStatus, TaskStatusEvent } from '../../shared/task'
+import type { ChatAttachment } from '../../shared/attachments'
 
 interface UseChatOptions {
   config: ApiConfig
@@ -15,7 +17,9 @@ interface UseChatOptions {
 
 interface UseChatReturn {
   isLoading: boolean
-  sendMessage: (content: string) => void
+  taskStatus: TaskStatus
+  sendMessage: (content: string, attachments?: ChatAttachment[]) => void
+  retryLastMessage: () => void
   abortMessage: () => void
   approveToolCall: (approvalId: string, argumentsHash: string) => void
   rejectToolCall: (approvalId: string) => void
@@ -39,7 +43,17 @@ export function useChat({
   updateConversation,
 }: UseChatOptions): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false)
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>('completed')
   const currentRequestRef = useRef<ActiveRequest | null>(null)
+  const lastAttachmentsRef = useRef<ChatAttachment[]>([])
+
+  const handleTaskStatus = useCallback(
+    (_event: unknown, data: { id: number; event: TaskStatusEvent }) => {
+      if (data.id !== currentRequestRef.current?.id) return
+      setTaskStatus(data.event.status)
+    },
+    []
+  )
 
   const handleChunk = useCallback(
     (_event: unknown, data: { id: number; content: string }) => {
@@ -64,6 +78,7 @@ export function useChat({
   const handleDone = useCallback((_event: unknown, data: { id: number }) => {
     if (data.id !== currentRequestRef.current?.id) return
     setIsLoading(false)
+    setTaskStatus('completed')
     currentRequestRef.current = null
   }, [])
 
@@ -85,6 +100,7 @@ export function useChat({
         return { ...conversation, messages }
       })
       setIsLoading(false)
+      setTaskStatus('failed')
       currentRequestRef.current = null
     },
     [updateConversation]
@@ -174,25 +190,60 @@ export function useChat({
   )
 
   useEffect(() => {
+    let cancelled = false
+    void window.electronAPI?.listPendingApprovals().then((pending) => {
+      if (cancelled) return
+      const approval = pending.find((item) => item.conversationId === activeConversation.id)
+      if (!approval) return
+      currentRequestRef.current = { id: approval.requestId, conversationId: approval.conversationId }
+      setIsLoading(true)
+      setTaskStatus('waiting_approval')
+      updateConversation(approval.conversationId, (conversation) => {
+        const lastMessage = conversation.messages[conversation.messages.length - 1]
+        if (!lastMessage || lastMessage.role !== 'assistant' || !lastMessage.toolCalls) return conversation
+        const index = lastMessage.toolCalls.findIndex((call) => call.id === approval.toolCallId)
+        if (index < 0) return conversation
+        const toolCalls = [...lastMessage.toolCalls]
+        toolCalls[index] = {
+          ...toolCalls[index],
+          approval: {
+            id: approval.id,
+            permission: approval.permission,
+            status: 'pending',
+            argumentsHash: approval.argumentsHash,
+            ...(approval.preview ? { preview: approval.preview } : {}),
+          },
+        }
+        const messages = [...conversation.messages]
+        messages[messages.length - 1] = { ...lastMessage, toolCalls }
+        return { ...conversation, messages }
+      })
+    })
+    return () => { cancelled = true }
+  }, [activeConversation.id, updateConversation])
+
+  useEffect(() => {
     if (!window.electronAPI) return
     const removeChunk = window.electronAPI.onStreamChunk(handleChunk)
     const removeDone = window.electronAPI.onStreamDone(handleDone)
     const removeError = window.electronAPI.onStreamError(handleError)
     const removeToolEvent = window.electronAPI.onToolEvent(handleToolEvent)
     const removeApprovalEvent = window.electronAPI.onApprovalEvent(handleApprovalEvent)
+    const removeTaskStatus = window.electronAPI.onTaskStatus(handleTaskStatus)
     return () => {
       removeChunk()
       removeDone()
       removeError()
       removeToolEvent()
       removeApprovalEvent()
+      removeTaskStatus()
     }
-  }, [handleChunk, handleDone, handleError, handleToolEvent, handleApprovalEvent])
+  }, [handleChunk, handleDone, handleError, handleToolEvent, handleApprovalEvent, handleTaskStatus])
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, attachments: ChatAttachment[] = [], replaceFailed = false) => {
       const trimmed = content.trim()
-      if (!trimmed) return
+      if (!trimmed && attachments.length === 0) return
       if (!config.apiKey.trim() || !config.baseUrl.trim() || !config.model.trim()) {
         return
       }
@@ -205,8 +256,12 @@ export function useChat({
       }
 
       const conversationId = activeConversation.id
+      lastAttachmentsRef.current = attachments
+      const baseMessages = replaceFailed && activeConversation.messages.at(-1)?.role === 'assistant' && activeConversation.messages.at(-1)?.content.startsWith('[Error:')
+        ? activeConversation.messages.slice(0, -1)
+        : activeConversation.messages
       const nextMessages: Message[] = [
-        ...activeConversation.messages,
+        ...baseMessages,
         { role: 'user', content: trimmed },
       ]
 
@@ -219,6 +274,7 @@ export function useChat({
         messages: [...nextMessages, { role: 'assistant', content: '' }],
       }))
       setIsLoading(true)
+      setTaskStatus('queued')
 
       requestId += 1
       const id = requestId
@@ -231,16 +287,32 @@ export function useChat({
         projectFolder: activeConversation.projectFolder,
         permissionMode: activeConversation.permissionMode,
         conversationId,
+        attachments,
+        enabledSkillIds: activeConversation.enabledSkillIds,
       })
     },
     [activeConversation, config, updateConversation]
   )
 
+  const retryLastMessage = useCallback(() => {
+    if (isLoading) return
+    const lastUser = [...activeConversation.messages].reverse().find((message) => message.role === 'user')
+    if (!lastUser) return
+    updateConversation(activeConversation.id, (conversation) => {
+      const last = conversation.messages[conversation.messages.length - 1]
+      if (last?.role === 'assistant' && last.content.startsWith('[Error:')) {
+        return { ...conversation, messages: conversation.messages.slice(0, -1) }
+      }
+      return conversation
+    })
+    sendMessage(lastUser.content, lastAttachmentsRef.current, true)
+  }, [activeConversation, isLoading, sendMessage, updateConversation])
+
   const abortMessage = useCallback(() => {
     const currentRequest = currentRequestRef.current
     if (!currentRequest) return
     window.electronAPI.abortMessage({ id: currentRequest.id })
-    // 本地同步把 pending 审批标记为已取消（主进程侧的 approval-event 可能因请求已清理而不再匹配）
+    // 停止后若还有 pending 审批，先将其标为 cancelled；approval-event 到达时会再次匹配并忽略
     updateConversation(currentRequest.conversationId, (conversation) => {
       const lastMessage = conversation.messages[conversation.messages.length - 1]
       if (!lastMessage || lastMessage.role !== 'assistant' || !lastMessage.toolCalls) {
@@ -258,6 +330,7 @@ export function useChat({
       return { ...conversation, messages }
     })
     setIsLoading(false)
+    setTaskStatus('cancelled')
     currentRequestRef.current = null
   }, [updateConversation])
 
@@ -271,7 +344,9 @@ export function useChat({
 
   return {
     isLoading,
+    taskStatus,
     sendMessage,
+    retryLastMessage,
     abortMessage,
     approveToolCall,
     rejectToolCall,

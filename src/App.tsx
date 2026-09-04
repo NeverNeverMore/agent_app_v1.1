@@ -5,6 +5,8 @@ import { ConfirmDialog } from './components/ConfirmDialog'
 import { SettingsDrawer } from './components/Settings'
 import { Sidebar } from './components/Sidebar'
 import { ToolList } from './components/ToolList'
+import { McpManager } from './components/McpManager'
+import { SkillManager } from './components/SkillManager'
 import { useChat } from './hooks/useChat'
 import { useApiConfig } from './hooks/useApiConfig'
 import { useConversations } from './hooks/useConversations'
@@ -54,8 +56,9 @@ function App() {
     deleteConversation,
     setProjectFolder,
     setPermissionMode,
+    setEnabledSkillIds,
   } = useConversations()
-  const { isLoading, sendMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
+  const { isLoading, taskStatus, sendMessage, retryLastMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
     config,
     activeConversation,
     updateConversation,
@@ -128,7 +131,9 @@ function App() {
             <Chat
               messages={activeConversation.messages}
               isLoading={isLoading}
+              taskStatus={taskStatus}
               onSend={sendMessage}
+              onRetry={retryLastMessage}
               onAbort={abortMessage}
               projectFolder={activeConversation.projectFolder}
               onSelectFolder={handleSelectFolder}
@@ -139,6 +144,14 @@ function App() {
             />
           ) : activeSection === 'tools' ? (
             <ToolList />
+          ) : activeSection === 'mcp' ? (
+            <McpManager />
+          ) : activeSection === 'skills' ? (
+            <SkillManager
+              projectFolder={activeConversation.projectFolder}
+              enabledSkillIds={activeConversation.enabledSkillIds}
+              onEnabledSkillIdsChange={setEnabledSkillIds}
+            />
           ) : (
             <PlaceholderPanel section={activeSection} />
           )}

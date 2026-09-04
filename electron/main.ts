@@ -2,14 +2,22 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ApiConfig, PermissionMode } from '../shared/types'
+import type { TaskStatusEvent } from '../shared/task'
+import type { ChatAttachment } from '../shared/attachments'
+import { cleanupAttachments, cleanupOldAttachments, prepareAttachments, selectAndCopyAttachments } from './attachments'
 import {
   approveApproval,
   cancelApprovalsForRequest,
+  configureApprovalStore,
+  listPendingApprovals,
   rejectApproval,
 } from './approvals'
 import { runAgentLoop } from './agentLoop'
 import { getToolRegistry } from './tools'
 import { protocolEndpoint } from './protocol'
+import { McpManager } from './mcp'
+import type { McpServerConfig } from '../shared/mcp'
+import { skillManager } from './skills'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -66,6 +74,7 @@ function createApplicationMenu() {
 
 let mainWindow: BrowserWindow | null = null
 const abortControllers = new Map<number, AbortController>()
+const mcpManager = new McpManager()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -93,6 +102,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  configureApprovalStore(path.join(app.getPath('userData'), 'pending-approvals.json'))
+  void cleanupOldAttachments(app.getPath('temp'))
+  skillManager.initialize(app.getPath('userData'))
+  void mcpManager.initialize(app.getPath('userData'), getToolRegistry())
   createWindow()
   createApplicationMenu()
 })
@@ -117,14 +130,18 @@ interface SendMessagePayload {
   projectFolder?: string
   permissionMode?: PermissionMode
   conversationId?: string
+  attachments?: ChatAttachment[]
+  enabledSkillIds?: string[]
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '' } = payload
+  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
   try {
+    event.sender.send('task-status', { id, event: { status: 'queued' } satisfies TaskStatusEvent })
+    const preparedAttachments = await prepareAttachments(attachments, (status) => event.sender.send('task-status', { id, event: { status } satisfies TaskStatusEvent }))
     await runAgentLoop({
       config,
       messages,
@@ -132,20 +149,27 @@ ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
       permissionMode,
       requestId: id,
       conversationId,
+      attachments: preparedAttachments,
+      enabledSkillIds,
       signal: controller.signal,
       emitChunk: (content) => event.sender.send('stream-chunk', { id, content }),
       emitToolEvent: (toolEvent) =>
         event.sender.send('tool-event', { id, event: toolEvent }),
       emitApproval: (approvalEvent) =>
         event.sender.send('approval-event', { id, event: approvalEvent }),
+      emitTaskStatus: (taskEvent) =>
+        event.sender.send('task-status', { id, event: taskEvent }),
     })
+    event.sender.send('task-status', { id, event: { status: controller.signal.aborted ? 'cancelled' : 'completed' } satisfies TaskStatusEvent })
     event.sender.send('stream-done', { id })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    event.sender.send('task-status', { id, event: { status: controller.signal.aborted ? 'cancelled' : 'failed', error: message } satisfies TaskStatusEvent })
     event.sender.send('stream-error', { id, error: message })
   } finally {
     cancelApprovalsForRequest(id)
     abortControllers.delete(id)
+    if (attachments.length) setTimeout(() => void cleanupAttachments(attachments), 10 * 60 * 1000)
   }
 })
 
@@ -167,6 +191,8 @@ ipcMain.handle(
 ipcMain.handle('reject-tool', (_event, { approvalId }: { approvalId: string }) =>
   rejectApproval(approvalId)
 )
+
+ipcMain.handle('list-pending-approvals', () => listPendingApprovals())
 
 ipcMain.handle('test-api', async (_event, config: ApiConfig) => {
   try {
@@ -214,6 +240,17 @@ ipcMain.handle('test-api', async (_event, config: ApiConfig) => {
   }
 })
 
+ipcMain.handle('import-attachments', async (_event, filePaths: string[]) => selectAndCopyAttachments(app.getPath('temp'), filePaths))
+
+ipcMain.handle('select-attachments', async () => {
+  if (!mainWindow) return []
+  const result = await dialog.showOpenDialog(mainWindow, { title: '????????', properties: ['openFile', 'multiSelections'] })
+  if (result.canceled) return []
+  return selectAndCopyAttachments(app.getPath('temp'), result.filePaths)
+})
+
+ipcMain.handle('cleanup-attachments', async (_event, attachments: ChatAttachment[]) => { await cleanupAttachments(attachments); return { ok: true } })
+
 ipcMain.handle('select-folder', async () => {
   if (!mainWindow) return null
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -224,3 +261,25 @@ ipcMain.handle('select-folder', async () => {
 })
 
 ipcMain.handle('list-tools', () => getToolRegistry().listMeta())
+
+ipcMain.handle('list-mcp-servers', () => mcpManager.list())
+ipcMain.handle('get-mcp-config-json', () => mcpManager.getConfigJson())
+ipcMain.handle('get-mcp-config-path', () => mcpManager.getConfigPath())
+ipcMain.handle('save-mcp-config-json', (_event, raw: string) => mcpManager.replaceFromJson(raw, getToolRegistry()))
+ipcMain.handle('save-mcp-server', (_event, input: Omit<McpServerConfig, 'id'> & { id?: string }) =>
+  mcpManager.upsert(input, getToolRegistry())
+)
+ipcMain.handle('delete-mcp-server', (_event, id: string) =>
+  mcpManager.remove(id, getToolRegistry()).then(() => ({ ok: true }))
+)
+ipcMain.handle('set-mcp-server-enabled', (_event, payload: { id: string; enabled: boolean }) =>
+  mcpManager.setEnabled(payload.id, payload.enabled, getToolRegistry())
+)
+ipcMain.handle('reconnect-mcp-server', (_event, id: string) =>
+  mcpManager.reconnect(id, getToolRegistry())
+)
+mcpManager.setListener((event) => mainWindow?.webContents.send('mcp-server-event', event))
+
+ipcMain.handle('list-skills', (_event, projectFolder: string) => skillManager.list(projectFolder))
+ipcMain.handle('reload-skills', (_event, projectFolder: string) => skillManager.list(projectFolder))
+ipcMain.handle('get-skill-directories', (_event, projectFolder: string) => skillManager.getDirectories(projectFolder))

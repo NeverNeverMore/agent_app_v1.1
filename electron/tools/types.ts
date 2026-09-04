@@ -1,12 +1,13 @@
-﻿import type { ToolPermission } from '../../shared/tools'
+import type { ToolPermission } from '../../shared/tools'
 
 import type { ApprovalPreview } from '../../shared/approvals'
 import type { ToolSource } from '../../shared/tools'
 
 export interface ToolSchemaProperty {
-  type: 'string' | 'number' | 'integer' | 'boolean'
+  type: 'string' | 'number' | 'integer' | 'boolean' | 'object'
   description?: string
   enum?: Array<string | number>
+  additionalProperties?: ToolSchemaProperty
 }
 
 export interface ToolInputSchema {

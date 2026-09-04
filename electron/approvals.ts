@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import type {
   ApprovalPreview,
   ApprovalRequest,
@@ -17,6 +19,37 @@ interface ApprovalEntry {
 
 /** 内存审批表：审批单消费一次即销毁，不可复用 */
 const entries = new Map<string, ApprovalEntry>()
+let storePath: string | null = null
+
+function persistPending(): void {
+  if (!storePath) return
+  const records = [...entries.values()].map((entry) => entry.record)
+  try {
+    fs.mkdirSync(path.dirname(storePath), { recursive: true })
+    fs.writeFileSync(storePath, JSON.stringify(records, null, 2), 'utf8')
+  } catch {
+    // 审批不能因日志落盘失败而阻塞主流程
+  }
+}
+
+/** 初始化审批存储。应用重启后旧 Promise 已不存在，因此清理旧 pending。 */
+export function configureApprovalStore(filePath: string): void {
+  storePath = filePath
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  } catch {
+    // 忽略清理失败，后续仍可继续工作
+  }
+  persistPending()
+}
+
+export function listPendingApprovals(): ApprovalRequest[] {
+  const now = Date.now()
+  for (const entry of [...entries.values()]) {
+    if (now > entry.record.expiresAt) settle(entry.record.id, 'expired')
+  }
+  return [...entries.values()].map((entry) => ({ ...entry.record }))
+}
 
 export function hashToolArguments(toolName: string, args: string): string {
   return createHash('sha256').update(`${toolName}\n${args}`).digest('hex')
@@ -28,6 +61,7 @@ function settle(id: string, status: ApprovalStatus): boolean {
   entry.record.status = status
   clearTimeout(entry.timer)
   entries.delete(id)
+  persistPending()
   entry.emitUpdate(status)
   entry.resolve(status)
   return true
@@ -75,6 +109,7 @@ export function createApproval(options: CreateApprovalOptions): {
       timer,
       emitUpdate: options.emitUpdate,
     })
+    persistPending()
   })
 
   return { request: record, decision }

@@ -26,6 +26,7 @@ function buildConversation(): Conversation {
     messages: [],
     projectFolder: '',
     permissionMode: 'ask',
+    enabledSkillIds: [],
     createdAt: now,
     updatedAt: now,
   }
@@ -72,6 +73,9 @@ function loadState(): ConversationsState {
               permissionMode: (
                 conversation.permissionMode === 'full' ? 'full' : 'ask'
               ) as PermissionMode,
+              enabledSkillIds: Array.isArray(conversation.enabledSkillIds)
+                ? conversation.enabledSkillIds.filter((id): id is string => typeof id === 'string')
+                : [],
             }))
         : []
 
@@ -204,6 +208,13 @@ export function useConversations() {
     [activeConversation.id, updateConversation]
   )
 
+  const setEnabledSkillIds = useCallback(
+    (enabledSkillIds: string[]) => {
+      updateConversation(activeConversation.id, (conversation) => ({ ...conversation, enabledSkillIds }))
+    },
+    [activeConversation.id, updateConversation]
+  )
+
   return {
     conversations,
     activeConversation,
@@ -214,5 +225,6 @@ export function useConversations() {
     deleteConversation,
     setProjectFolder,
     setPermissionMode,
+    setEnabledSkillIds,
   }
 }
