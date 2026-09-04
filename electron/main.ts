@@ -17,6 +17,7 @@ import { getToolRegistry } from './tools'
 import { protocolEndpoint } from './protocol'
 import { McpManager } from './mcp'
 import type { McpServerConfig } from '../shared/mcp'
+import { skillManager } from './skills'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -103,6 +104,7 @@ function createWindow() {
 app.whenReady().then(() => {
   configureApprovalStore(path.join(app.getPath('userData'), 'pending-approvals.json'))
   void cleanupOldAttachments(app.getPath('temp'))
+  skillManager.initialize(app.getPath('userData'))
   void mcpManager.initialize(app.getPath('userData'), getToolRegistry())
   createWindow()
   createApplicationMenu()
@@ -129,10 +131,11 @@ interface SendMessagePayload {
   permissionMode?: PermissionMode
   conversationId?: string
   attachments?: ChatAttachment[]
+  enabledSkillIds?: string[]
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '', attachments = [] } = payload
+  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
@@ -147,6 +150,7 @@ ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
       requestId: id,
       conversationId,
       attachments: preparedAttachments,
+      enabledSkillIds,
       signal: controller.signal,
       emitChunk: (content) => event.sender.send('stream-chunk', { id, content }),
       emitToolEvent: (toolEvent) =>
@@ -275,3 +279,7 @@ ipcMain.handle('reconnect-mcp-server', (_event, id: string) =>
   mcpManager.reconnect(id, getToolRegistry())
 )
 mcpManager.setListener((event) => mainWindow?.webContents.send('mcp-server-event', event))
+
+ipcMain.handle('list-skills', (_event, projectFolder: string) => skillManager.list(projectFolder))
+ipcMain.handle('reload-skills', (_event, projectFolder: string) => skillManager.list(projectFolder))
+ipcMain.handle('get-skill-directories', (_event, projectFolder: string) => skillManager.getDirectories(projectFolder))

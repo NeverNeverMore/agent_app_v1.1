@@ -288,6 +288,7 @@ export function useChat({
         permissionMode: activeConversation.permissionMode,
         conversationId,
         attachments,
+        enabledSkillIds: activeConversation.enabledSkillIds,
       })
     },
     [activeConversation, config, updateConversation]

@@ -5,6 +5,7 @@ import type { ApiConfig, PermissionMode } from '../shared/types'
 import type { TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
 import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../shared/mcp'
+import type { SkillInfo } from '../shared/skills'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -15,6 +16,7 @@ export interface ElectronAPI {
     permissionMode: PermissionMode
     conversationId: string
     attachments?: ChatAttachment[]
+    enabledSkillIds?: string[]
   }) => void
   abortMessage: (payload: { id: number }) => void
   selectFolder: () => Promise<string | null>
@@ -31,6 +33,9 @@ export interface ElectronAPI {
   deleteMcpServer: (id: string) => Promise<{ ok: boolean }>
   setMcpServerEnabled: (payload: { id: string; enabled: boolean }) => Promise<McpServerInfo>
   reconnectMcpServer: (id: string) => Promise<McpServerInfo>
+  listSkills: (projectFolder: string) => Promise<SkillInfo[]>
+  reloadSkills: (projectFolder: string) => Promise<SkillInfo[]>
+  getSkillDirectories: (projectFolder: string) => Promise<{ global: string; project: string }>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string
@@ -86,6 +91,9 @@ const api: ElectronAPI = {
   deleteMcpServer: (id) => ipcRenderer.invoke('delete-mcp-server', id),
   setMcpServerEnabled: (payload) => ipcRenderer.invoke('set-mcp-server-enabled', payload),
   reconnectMcpServer: (id) => ipcRenderer.invoke('reconnect-mcp-server', id),
+  listSkills: (projectFolder) => ipcRenderer.invoke('list-skills', projectFolder),
+  reloadSkills: (projectFolder) => ipcRenderer.invoke('reload-skills', projectFolder),
+  getSkillDirectories: (projectFolder) => ipcRenderer.invoke('get-skill-directories', projectFolder),
   approveTool: (payload) => ipcRenderer.invoke('approve-tool', payload),
   rejectTool: (payload) => ipcRenderer.invoke('reject-tool', payload),
   listPendingApprovals: () => ipcRenderer.invoke('list-pending-approvals'),

@@ -6,6 +6,7 @@ import { SettingsDrawer } from './components/Settings'
 import { Sidebar } from './components/Sidebar'
 import { ToolList } from './components/ToolList'
 import { McpManager } from './components/McpManager'
+import { SkillManager } from './components/SkillManager'
 import { useChat } from './hooks/useChat'
 import { useApiConfig } from './hooks/useApiConfig'
 import { useConversations } from './hooks/useConversations'
@@ -55,6 +56,7 @@ function App() {
     deleteConversation,
     setProjectFolder,
     setPermissionMode,
+    setEnabledSkillIds,
   } = useConversations()
   const { isLoading, taskStatus, sendMessage, retryLastMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
     config,
@@ -144,6 +146,12 @@ function App() {
             <ToolList />
           ) : activeSection === 'mcp' ? (
             <McpManager />
+          ) : activeSection === 'skills' ? (
+            <SkillManager
+              projectFolder={activeConversation.projectFolder}
+              enabledSkillIds={activeConversation.enabledSkillIds}
+              onEnabledSkillIdsChange={setEnabledSkillIds}
+            />
           ) : (
             <PlaceholderPanel section={activeSection} />
           )}

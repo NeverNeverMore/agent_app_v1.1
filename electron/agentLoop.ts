@@ -12,6 +12,7 @@ import type { AgentMessage } from './protocol'
 import type { PermissionMode } from '../shared/types'
 import type { TaskStatus, TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
+import { skillManager, withSkillPrompt } from './skills'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -26,6 +27,7 @@ export interface AgentLoopOptions {
   requestId: number
   conversationId: string
   attachments?: ChatAttachment[]
+  enabledSkillIds?: string[]
   signal: AbortSignal
   emitChunk: (content: string) => void
   emitToolEvent: (event: ToolStreamEvent) => void
@@ -61,6 +63,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     )
   }
   const systemPrompt = systemPrompts.join('\n\n')
+  const skillPrompt = await skillManager.prompts(options.enabledSkillIds ?? [], projectFolder)
+  const fullSystemPrompt = withSkillPrompt(systemPrompt, skillPrompt)
   const attachmentContext = (options.attachments ?? []).map((item) => {
     if (item.kind === 'image') return `[\u9644\u4ef6\u56fe\u7247] ${item.name}`
     if (item.parseStatus === 'failed') return `[\u9644\u4ef6\u89e3\u6790\u5931\u8d25] ${item.name}: ${item.error ?? '\u672a\u77e5\u9519\u8bef'}`
@@ -82,7 +86,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     const isLastStep = step >= MAX_TOOL_STEPS
 
     const result = await requestProtocolModel(
-      config, systemPrompt, messages, tools, isLastStep, signal, emitChunk
+      config, fullSystemPrompt, messages, tools, isLastStep, signal, emitChunk
     )
 
     const calls = result.toolCalls.filter((call) => call.name)
