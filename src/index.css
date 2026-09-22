@@ -130,14 +130,16 @@ input {
   font-weight: 600;
 }
 
-.history-count {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--bg);
-  text-align: center;
-  font-size: 12px;
-}
+.project-rename { display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary); border-radius: 6px; padding: 3px; }
+.project-rename:hover { color: var(--accent); background: var(--accent-soft); }
+.project-group { margin-bottom: 5px; }
+.project-header { display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 6px; color: var(--text-secondary); }
+.project-toggle { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; padding: 6px 5px; color: inherit; text-align: left; font-size: 13px; font-weight: 600; }
+.project-toggle:hover { color: var(--accent); background: var(--accent-soft); border-radius: 7px; }
+.project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-toggle small { margin-left: auto; font-size: 11px; font-weight: 400; }
+.conversation-item { margin-left: 12px; }
+.project-name-input { min-width: 0; width: 100%; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; font-weight: 600; }
 
 .conversation-list {
   flex: 1;
@@ -568,7 +570,10 @@ input {
 }
 
 .save-status {
-  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 96px;
   color: #1e7e34;
   font-size: 13px;
   opacity: 0;
@@ -1197,6 +1202,8 @@ input {
   min-width: 0;
   flex: 1;
 }
+.approval-model { max-width: 150px; margin-left: auto; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.chat-model-name { max-width: 180px; margin-left: auto; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
 .approval-banner-title {
   font-weight: 600;

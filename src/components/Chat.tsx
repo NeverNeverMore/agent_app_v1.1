@@ -20,6 +20,7 @@ interface ChatProps {
   onPermissionModeChange: (mode: PermissionMode) => void
   onApproveTool: (approvalId: string, argumentsHash: string) => void
   onRejectTool: (approvalId: string) => void
+  modelName: string
 }
 
 export function Chat({
@@ -35,6 +36,7 @@ export function Chat({
   onPermissionModeChange,
   onApproveTool,
   onRejectTool,
+  modelName,
 }: ChatProps) {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
@@ -263,6 +265,7 @@ export function Chat({
                 </div>
               )}
             </div>
+            <span className="approval-model" title={modelName || '模型未知'}>{modelName || '模型未知'}</span>
             <div className="approval-banner-actions">
               <button
                 type="button"
@@ -370,6 +373,7 @@ export function Chat({
             </div>
           )}
         </div>
+        <span className="chat-model-name" title={modelName || '模型未知'}>{modelName || '模型未知'}</span>
       </div>
     </div>
   )
