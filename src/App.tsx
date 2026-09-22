@@ -57,6 +57,8 @@ function App() {
     setProjectFolder,
     setPermissionMode,
     setEnabledSkillIds,
+    projects,
+    renameProject,
   } = useConversations()
   const { isLoading, taskStatus, sendMessage, retryLastMessage, abortMessage, approveToolCall, rejectToolCall } = useChat({
     config,
@@ -64,9 +66,9 @@ function App() {
     updateConversation,
   })
 
-  const handleNewConversation = () => {
+  const handleNewConversation = (projectId?: string) => {
     abortMessage()
-    createConversation()
+    createConversation(projectId)
     setActiveSection('chat')
   }
 
@@ -105,6 +107,8 @@ function App() {
         onRenameConversation={renameConversation}
         onDeleteConversation={handleDeleteRequest}
         onSectionChange={setActiveSection}
+        projects={projects}
+        onRenameProject={renameProject}
       />
 
       <div className="app-content">
@@ -141,6 +145,7 @@ function App() {
               onPermissionModeChange={setPermissionMode}
               onApproveTool={approveToolCall}
               onRejectTool={rejectToolCall}
+              modelName={config.model}
             />
           ) : activeSection === 'tools' ? (
             <ToolList />

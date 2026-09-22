@@ -19,6 +19,15 @@ export interface Conversation {
   enabledSkillIds: string[]
   createdAt: number
   updatedAt: number
+  projectId: string
+}
+
+export interface Project {
+  id: string
+  name: string
+  folder: string
+  createdAt: number
+  updatedAt: number
 }
 
 export type MainSection = 'chat' | 'tools' | 'skills' | 'mcp'

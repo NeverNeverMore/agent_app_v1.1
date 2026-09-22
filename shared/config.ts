@@ -4,7 +4,7 @@ export const API_BASE_URL = 'https://api.kimi.com/coding/v1'
 
 export const DEFAULT_MODEL = 'kimi-code-plan'
 
-export const MODEL_DISPLAY_NAME = 'chat'
+export const MODEL_DISPLAY_NAME = 'LINGQI'
 
 export const APP_NAME = '四方上行科技有限公司'
 

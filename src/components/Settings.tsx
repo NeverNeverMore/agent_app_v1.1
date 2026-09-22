@@ -28,10 +28,17 @@ export function SettingsDrawer({
   const [isSaved, setIsSaved] = useState(false)
 
   useEffect(() => {
+    if (!isOpen) return
     setDraft(config)
     setTestStatus({ type: 'idle' })
     setIsSaved(false)
-  }, [config, isOpen])
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isSaved) return
+    const timer = window.setTimeout(() => setIsSaved(false), 2200)
+    return () => window.clearTimeout(timer)
+  }, [isSaved])
 
   if (!isOpen) return null
 
@@ -108,7 +115,7 @@ export function SettingsDrawer({
                 type={showKey ? 'text' : 'password'}
                 value={draft.apiKey}
                 onChange={(e) => handleChange({ apiKey: e.target.value })}
-                placeholder="输入你的 chat 接口密钥"
+                placeholder="输入你的 LINGQI 接口密钥"
                 autoFocus
               />
               <button
@@ -199,8 +206,8 @@ export function SettingsDrawer({
         </div>
 
         <div className="drawer-footer">
-          <span className={`save-status ${isSaved ? 'visible' : ''}`}>
-            {isSaved ? '已保存' : ''}
+          <span className={`save-status ${isSaved ? 'visible' : ''}`} role="status" aria-live="polite">
+            {isSaved ? <><Check size={15} /> 保存成功</> : null}
           </span>
           <button type="button" onClick={handleSave} className="primary">
             保存
