@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { AlertTriangle, Check, ChevronUp, FolderOpen, Hand, Loader2, Send, ShieldAlert, Square, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronUp, Folder, FolderOpen, Hand, Loader2, Plus, Send, ShieldAlert, Square, X } from 'lucide-react'
 import type { Message } from '../types/chat'
 import { MessageItem } from './Message'
 import { MODEL_DISPLAY_NAME } from '../../shared/config'
@@ -16,6 +16,7 @@ interface ChatProps {
   onAbort: () => void
   projectFolder: string
   onSelectFolder: () => void
+  onOpenFolder: () => void
   permissionMode: PermissionMode
   onPermissionModeChange: (mode: PermissionMode) => void
   onApproveTool: (approvalId: string, argumentsHash: string) => void
@@ -32,6 +33,7 @@ export function Chat({
   onAbort,
   projectFolder,
   onSelectFolder,
+  onOpenFolder,
   permissionMode,
   onPermissionModeChange,
   onApproveTool,
@@ -48,6 +50,8 @@ export function Chat({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const permissionSelectorRef = useRef<HTMLDivElement>(null)
+  const folderSelectorRef = useRef<HTMLDivElement>(null)
+  const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -94,6 +98,22 @@ export function Chat({
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isPermissionMenuOpen])
+
+  useEffect(() => {
+    if (!isFolderMenuOpen) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!folderSelectorRef.current?.contains(event.target as Node)) setIsFolderMenuOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFolderMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isFolderMenuOpen])
 
   const permissionOptions = [
     {
@@ -322,15 +342,23 @@ export function Chat({
       </form>
       {attachmentError && <div className="attachment-error" role="alert">{attachmentError}</div>}
       <div className="project-folder-bar">
+        <div className={`folder-selector${isFolderMenuOpen ? ' open' : ''}`} ref={folderSelectorRef}>
         <button
           type="button"
           className="folder-button"
-          onClick={onSelectFolder}
+          onClick={() => !isLoading && setIsFolderMenuOpen((open) => !open)}
+          disabled={isLoading}
           title={projectFolder || '关联项目文件夹'}
         >
           <FolderOpen size={16} />
+          <ChevronUp size={14} className="folder-chevron" aria-hidden="true" />
           <span>{projectFolder ? projectFolder : '关联项目文件夹'}</span>
         </button>
+        {isFolderMenuOpen && <div className="folder-menu" role="menu" aria-label="项目文件夹操作">
+          <button type="button" className="folder-menu-item" role="menuitem" onClick={() => { setIsFolderMenuOpen(false); onSelectFolder() }}><Plus size={18} aria-hidden="true" /><span>选择目录</span></button>
+          <button type="button" className="folder-menu-item" role="menuitem" disabled={!projectFolder} onClick={() => { setIsFolderMenuOpen(false); onOpenFolder() }}><Folder size={18} aria-hidden="true" /><span>在文件管理器中打开</span></button>
+        </div>}
+        </div>
         <div className={`permission-selector${isPermissionMenuOpen ? ' open' : ''}`} ref={permissionSelectorRef}>
           <button
             type="button"

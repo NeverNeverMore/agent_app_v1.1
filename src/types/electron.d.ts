@@ -20,6 +20,7 @@ export interface ElectronAPI {
   }) => void
   abortMessage: (payload: { id: number }) => void
   selectFolder: () => Promise<string | null>
+  openFolder: (folder: string) => Promise<{ ok: boolean; error?: string }>
   selectAttachments: () => Promise<ChatAttachment[]>
   importAttachments: (filePaths: string[]) => Promise<ChatAttachment[]>
   getFilePath: (file: File) => string

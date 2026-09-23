@@ -842,6 +842,12 @@ input {
   max-width: min(100%, 520px);
   border-radius: 8px;
 }
+.folder-selector { position: relative; }
+.folder-chevron { margin-left: auto; }
+.folder-menu { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 220px; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14); }
+.folder-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 7px; color: var(--text); text-align: left; font-size: 13px; white-space: nowrap; }
+.folder-menu-item:hover:not(:disabled) { background: var(--bg); }
+.folder-menu-item:disabled { color: var(--text-secondary); cursor: not-allowed; opacity: 0.55; }
 
 .permission-selector {
   position: relative;

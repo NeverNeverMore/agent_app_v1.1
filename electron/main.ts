@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ApiConfig, PermissionMode } from '../shared/types'
@@ -258,6 +258,16 @@ ipcMain.handle('select-folder', async () => {
     properties: ['openDirectory', 'createDirectory'],
   })
   return result.canceled ? null : result.filePaths[0] ?? null
+})
+
+ipcMain.handle('open-folder', async (_event, folder: string) => {
+  if (!folder || typeof folder !== 'string') return { ok: false, error: '目录路径为空' }
+  try {
+    const error = await shell.openPath(folder)
+    return error ? { ok: false, error } : { ok: true }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
 })
 
 ipcMain.handle('list-tools', () => getToolRegistry().listMeta())

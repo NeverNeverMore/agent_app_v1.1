@@ -20,6 +20,7 @@ export interface ElectronAPI {
   }) => void
   abortMessage: (payload: { id: number }) => void
   selectFolder: () => Promise<string | null>
+  openFolder: (folder: string) => Promise<{ ok: boolean; error?: string }>
   selectAttachments: () => Promise<ChatAttachment[]>
   importAttachments: (filePaths: string[]) => Promise<ChatAttachment[]>
   getFilePath: (file: File) => string
@@ -78,6 +79,7 @@ const api: ElectronAPI = {
   sendMessage: (payload) => ipcRenderer.send('send-message', payload),
   abortMessage: (payload) => ipcRenderer.send('abort-message', payload),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  openFolder: (folder) => ipcRenderer.invoke('open-folder', folder),
   selectAttachments: () => ipcRenderer.invoke('select-attachments'),
   importAttachments: (filePaths) => ipcRenderer.invoke('import-attachments', filePaths),
   getFilePath: (file) => webUtils.getPathForFile(file),

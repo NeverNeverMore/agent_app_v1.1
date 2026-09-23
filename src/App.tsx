@@ -95,6 +95,12 @@ function App() {
     if (folder) setProjectFolder(folder)
   }
 
+  const handleOpenFolder = async () => {
+    if (!activeConversation.projectFolder || !window.electronAPI) return
+    const result = await window.electronAPI.openFolder(activeConversation.projectFolder)
+    if (!result.ok) console.error('打开项目目录失败', result.error)
+  }
+
 
   return (
     <div className="app">
@@ -141,6 +147,7 @@ function App() {
               onAbort={abortMessage}
               projectFolder={activeConversation.projectFolder}
               onSelectFolder={handleSelectFolder}
+              onOpenFolder={handleOpenFolder}
               permissionMode={activeConversation.permissionMode}
               onPermissionModeChange={setPermissionMode}
               onApproveTool={approveToolCall}
