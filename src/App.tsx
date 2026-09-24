@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { Chat } from './components/Chat'
 import { ConfirmDialog } from './components/ConfirmDialog'
@@ -51,6 +51,9 @@ function App() {
   const [activeSection, setActiveSection] = useState<MainSection>('chat')
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null)
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null)
+  const [isFileDragActive, setIsFileDragActive] = useState(false)
+  const fileDragCounterRef = useRef(0)
+  const appMainRef = useRef<HTMLElement>(null)
   const { config, updateConfig } = useApiConfig()
   const {
     conversations,
@@ -128,6 +131,49 @@ function App() {
     setProjectToEdit(null)
   }
 
+  useEffect(() => {
+    const root = appMainRef.current
+    if (!root) return
+    const isFileDrag = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
+    const onEnter = (event: DragEvent) => {
+      if (!isFileDrag(event)) return
+      event.preventDefault()
+      fileDragCounterRef.current += 1
+      setIsFileDragActive(true)
+      console.debug('[drag] enter', { types: Array.from(event.dataTransfer?.types ?? []) })
+    }
+    const onOver = (event: DragEvent) => {
+      if (!isFileDrag(event)) return
+      event.preventDefault()
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+      console.debug('[drag] over', { types: Array.from(event.dataTransfer?.types ?? []) })
+    }
+    const onLeave = (event: DragEvent) => {
+      if (!isFileDrag(event)) return
+      if (event.relatedTarget instanceof Node && root.contains(event.relatedTarget)) return
+      fileDragCounterRef.current = 0
+      setIsFileDragActive(false)
+      console.debug('[drag] leave')
+    }
+    const onDrop = (event: DragEvent) => {
+      if (!isFileDrag(event)) return
+      event.preventDefault()
+      fileDragCounterRef.current = 0
+      setIsFileDragActive(false)
+      console.debug('[drag] drop', { count: event.dataTransfer?.files.length ?? 0 })
+    }
+    root.addEventListener('dragenter', onEnter, true)
+    root.addEventListener('dragover', onOver, true)
+    root.addEventListener('dragleave', onLeave, true)
+    root.addEventListener('drop', onDrop, true)
+    return () => {
+      root.removeEventListener('dragenter', onEnter, true)
+      root.removeEventListener('dragover', onOver, true)
+      root.removeEventListener('dragleave', onLeave, true)
+      root.removeEventListener('drop', onDrop, true)
+    }
+  }, [activeSection])
+
 
   return (
     <div className="app">
@@ -166,7 +212,8 @@ function App() {
           </div>
         </header>
 
-        <main className="app-main">
+        <main className="app-main" ref={appMainRef}>
+          {isFileDragActive && <div className="main-drop-overlay" role="status" aria-live="polite"><span>释放文件以上传</span></div>}
           {activeSection === 'chat' ? (
             <Chat
               messages={activeConversation.messages}
@@ -185,6 +232,7 @@ function App() {
               onApproveTool={approveToolCall}
               onRejectTool={rejectToolCall}
               modelName={config.model}
+              isFileDragActive={isFileDragActive}
             />
           ) : activeSection === 'tools' ? (
             <ToolList />

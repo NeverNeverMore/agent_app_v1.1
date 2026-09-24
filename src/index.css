@@ -350,6 +350,7 @@ input {
 }
 
 .app-main {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -358,6 +359,7 @@ input {
 }
 
 .chat-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1401,6 +1403,8 @@ input {
 .message-attachment-copy strong { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .message-attachment-copy small { color: var(--text-secondary); font-size: 11px; }
 .chat-container.drag-over { outline: 2px dashed #8b5cf6; outline-offset: -8px; }
+.drop-overlay { position: absolute; inset: 12px; z-index: 20; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgba(232,241,253,.88); color: var(--accent); font-size: 16px; font-weight: 600; pointer-events: none; }
+.main-drop-overlay { position: absolute; inset: 12px; z-index: 40; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgba(232,241,253,.88); color: var(--accent); font-size: 16px; font-weight: 600; pointer-events: none; }
 
 .mcp-panel { padding: 28px; max-width: 960px; margin: 0 auto; }
 .mcp-panel-header, .mcp-form-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }

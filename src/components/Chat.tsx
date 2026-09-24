@@ -24,6 +24,7 @@ interface ChatProps {
   onApproveTool: (approvalId: string, argumentsHash: string) => void
   onRejectTool: (approvalId: string) => void
   modelName: string
+  isFileDragActive: boolean
 }
 
 export function Chat({
@@ -42,11 +43,12 @@ export function Chat({
   onApproveTool,
   onRejectTool,
   modelName,
+  isFileDragActive,
 }: ChatProps) {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
-  const [isDragActive, setIsDragActive] = useState(false)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [thinkingSeconds, setThinkingSeconds] = useState(0)
   const [isPermissionMenuOpen, setIsPermissionMenuOpen] = useState(false)
@@ -144,7 +146,14 @@ export function Chat({
     setAttachmentError('')
     try {
       const imported = await importer()
-      setAttachments((current) => [...current, ...imported].slice(0, 5))
+      const available = Math.max(0, 5 - attachments.length)
+      const accepted = imported.slice(0, available)
+      const discarded = imported.slice(available)
+      setAttachments((current) => [...current, ...accepted].slice(0, 5))
+      if (discarded.length) {
+        void window.electronAPI?.cleanupAttachments(discarded)
+        setAttachmentError(`最多可添加 5 个附件，已忽略 ${discarded.length} 个文件`)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error('附件上传失败', error)
@@ -158,6 +167,7 @@ export function Chat({
 
   const importDroppedFiles = (files: File[]) => {
     if (isLoading || !window.electronAPI) return
+    console.debug('[attachments] drop', { count: files.length, types: files.map((file) => file.type) })
     const paths = files.map((file) => {
       try {
         return window.electronAPI.getFilePath(file) || (file as File & { path?: string }).path || ''
@@ -165,50 +175,30 @@ export function Chat({
         return (file as File & { path?: string }).path || ''
       }
     }).filter(Boolean)
+    console.debug('[attachments] resolved paths', { count: paths.length })
     if (!paths.length) {
-      setAttachmentError('无法读取拖入文件，请使用本地文件或点击回形针选择')
+      setAttachmentError('无法获取本地文件路径，请确认从文件资源管理器拖入')
       return
     }
-    void addAttachments(() => window.electronAPI!.importAttachments(paths))
-  }
-
-  const handleDragOver = (event: React.DragEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    event.dataTransfer.dropEffect = 'copy'
-    if (!isLoading) setIsDragActive(true)
-  }
-
-  const handleDragLeave = (event: React.DragEvent) => {
-    event.preventDefault()
-    if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsDragActive(false)
-  }
-
-  const handleDrop = (event: React.DragEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setIsDragActive(false)
-    importDroppedFiles(Array.from(event.dataTransfer.files))
+    void addAttachments(() => window.electronAPI!.importAttachments(paths)).catch((error) => {
+      console.error('[attachments] import failed', error)
+    })
   }
 
   useEffect(() => {
-    const preventWindowFileDrop = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
-    }
-    const handleWindowDrop = (event: DragEvent) => {
-      if (!event.dataTransfer?.files.length || isLoading) return
+    const container = chatContainerRef.current
+    if (!container) return
+    const handleDrop = (event: DragEvent) => {
+      if (!Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
       event.preventDefault()
-      event.stopPropagation()
-      setIsDragActive(false)
-      importDroppedFiles(Array.from(event.dataTransfer.files))
+      const files = Array.from(event.dataTransfer?.files ?? [])
+      console.debug('[drag] chat drop target', { count: files.length, target: event.target })
+      if (!isLoading && files.length) importDroppedFiles(files)
     }
-    window.addEventListener('dragover', preventWindowFileDrop, true)
-    window.addEventListener('drop', handleWindowDrop, true)
-    return () => {
-      window.removeEventListener('dragover', preventWindowFileDrop, true)
-      window.removeEventListener('drop', handleWindowDrop, true)
-    }
-  }, [isLoading])
+    container.addEventListener('drop', handleDrop)
+    return () => container.removeEventListener('drop', handleDrop)
+  }, [isLoading, attachments.length])
+
   const removeAttachment = (attachment: ChatAttachment) => {
     setAttachments((current) => current.filter((item) => item.id !== attachment.id))
     void window.electronAPI?.cleanupAttachments([attachment])
@@ -233,7 +223,7 @@ export function Chat({
   }
 
   return (
-    <div className={`chat-container${isDragActive ? ' drag-over' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+    <div className={`chat-container${isFileDragActive ? ' drag-over' : ''}`} ref={chatContainerRef}>
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome">
