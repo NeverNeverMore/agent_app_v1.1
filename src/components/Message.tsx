@@ -1,10 +1,43 @@
-﻿import { CheckCircle2, Loader2, Wrench, XCircle } from 'lucide-react'
+import { CheckCircle2, Loader2, Wrench, XCircle } from 'lucide-react'
+import { File, FileSpreadsheet, FileText, Image as ImageIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { MODEL_DISPLAY_NAME } from '../../shared/config'
 import type { ToolCallRecord } from '../../shared/tools'
 import type { Message } from '../types/chat'
 
 interface MessageItemProps {
   message: Message
+}
+
+function formatSize(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function attachmentIcon(kind: string) {
+  if (kind === 'image') return ImageIcon
+  if (kind === 'pdf' || kind === 'docx' || kind === 'text') return FileText
+  if (kind === 'xlsx' || kind === 'xls') return FileSpreadsheet
+  return File
+}
+
+function AttachmentItem({ attachment }: { attachment: NonNullable<Message['attachments']>[number] }) {
+  const [preview, setPreview] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    if (attachment.dataUrl) {
+      setPreview(attachment.dataUrl)
+      return () => { active = false }
+    }
+    if (attachment.kind === 'image' && attachment.previewId) {
+      void window.electronAPI?.readImagePreview(attachment.previewId).then((value) => { if (active) setPreview(value) })
+    }
+    return () => { active = false }
+  }, [attachment.kind, attachment.previewId])
+  if (preview) return <div className="message-attachment image-attachment" title={attachment.name}><img src={preview} alt={attachment.name} /></div>
+  const Icon = attachmentIcon(attachment.kind)
+  return <div className="message-attachment file-attachment" title={attachment.name}><Icon size={22} /><span className="message-attachment-copy"><strong>{attachment.name}</strong><small>{formatSize(attachment.size)}</small></span></div>
 }
 
 function toolStatusText(call: ToolCallRecord): string {
@@ -46,6 +79,11 @@ export function MessageItem({ message }: MessageItemProps) {
   const isUser = message.role === 'user'
   return (
     <div className={`message ${isUser ? 'user' : 'assistant'}`}>
+      {message.attachments && message.attachments.length > 0 && (
+        <div className="message-attachments" aria-label="消息附件">
+          {message.attachments.map((attachment) => <AttachmentItem key={attachment.id} attachment={attachment} />)}
+        </div>
+      )}
       <div className="message-bubble">
         <div className="message-role">{isUser ? '你' : MODEL_DISPLAY_NAME}</div>
         {message.toolCalls && message.toolCalls.length > 0 && (

@@ -106,6 +106,13 @@ export function useConversations() {
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch {} }, [state])
 
+  useEffect(() => {
+    const referencedIds = [...new Set(state.conversations.flatMap((conversation) =>
+      conversation.messages.flatMap((message) => (message.attachments ?? []).flatMap((attachment) => attachment.previewId ? [attachment.previewId] : []))
+    ))]
+    void window.electronAPI?.syncImagePreviewReferences(referencedIds).catch(() => undefined)
+  }, [state])
+
   const conversations = useMemo(() => state.conversations.filter(hasUserMessage).sort((a, b) => b.updatedAt - a.updatedAt), [state.conversations])
   const projects = useMemo(() => [...state.projects].filter((project) => state.conversations.some((conversation) => conversation.projectId === project.id && hasUserMessage(conversation))).sort((a, b) => {
     const latest = (project: Project) => Math.max(...state.conversations.filter((item) => item.projectId === project.id).map((item) => item.updatedAt), project.updatedAt)

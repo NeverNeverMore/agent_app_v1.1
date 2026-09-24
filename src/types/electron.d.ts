@@ -26,6 +26,9 @@ export interface ElectronAPI {
   importAttachments: (filePaths: string[]) => Promise<ChatAttachment[]>
   getFilePath: (file: File) => string
   cleanupAttachments: (attachments: ChatAttachment[]) => Promise<{ ok: boolean }>
+  persistImagePreviews: (attachments: ChatAttachment[]) => Promise<Record<string, string>>
+  readImagePreview: (previewId: string) => Promise<string | null>
+  syncImagePreviewReferences: (referencedIds: string[]) => Promise<{ ok: boolean }>
   listTools: () => Promise<ToolMeta[]>
   listMcpServers: () => Promise<McpServerInfo[]>
   getMcpConfigJson: () => Promise<string>

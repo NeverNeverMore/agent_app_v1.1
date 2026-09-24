@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import type { ApiConfig, PermissionMode } from '../shared/types'
 import type { TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
-import { cleanupAttachments, cleanupOldAttachments, prepareAttachments, selectAndCopyAttachments } from './attachments'
+import { cleanupAttachments, cleanupOldAttachments, cleanupUnreferencedPreviews, persistImagePreviews, prepareAttachments, readImagePreview, selectAndCopyAttachments } from './attachments'
 import {
   approveApproval,
   cancelApprovalsForRequest,
@@ -252,6 +252,12 @@ ipcMain.handle('select-attachments', async () => {
 })
 
 ipcMain.handle('cleanup-attachments', async (_event, attachments: ChatAttachment[]) => { await cleanupAttachments(attachments); return { ok: true } })
+ipcMain.handle('persist-image-previews', async (_event, attachments: ChatAttachment[]) => persistImagePreviews(app.getPath('temp'), app.getPath('userData'), attachments))
+ipcMain.handle('read-image-preview', async (_event, previewId: string) => readImagePreview(app.getPath('userData'), previewId))
+ipcMain.handle('sync-image-preview-references', async (_event, referencedIds: string[]) => {
+  await cleanupUnreferencedPreviews(app.getPath('userData'), Array.isArray(referencedIds) ? referencedIds : [])
+  return { ok: true }
+})
 
 ipcMain.handle('select-folder', async () => {
   if (!mainWindow) return null

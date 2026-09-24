@@ -16,6 +16,7 @@ export interface ChatAttachment {
   mimeType: string
   size: number
   tempPath?: string
+  previewId?: string
   extractedText?: string
   dataUrl?: string
   parseStatus: AttachmentParseStatus
