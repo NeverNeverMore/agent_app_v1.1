@@ -14,13 +14,16 @@ function fail(code: string, message: string, retryable = false): ToolResult {
 }
 
 /** 安全边界：所有文件路径必须解析在项目文件夹之内 */
-import { resolveExistingWithinRoot, resolveWriteWithinRoot } from "./pathSecurity"
+import { resolveExistingWithinRoot, resolveWriteWithinRoot, resolveExistingWithinRoots, resolveWriteWithinRoots } from "./pathSecurity"
 
 async function resolveWithinRoot(projectFolder: string, relativePath: string): Promise<string> { return resolveExistingWithinRoot(projectFolder, relativePath) }
 async function resolveWritePath(projectFolder: string, requestedPath: string, allowOutsideRoot: boolean): Promise<string> {
   if (allowOutsideRoot) return path.resolve(projectFolder || process.cwd(), requestedPath)
   return resolveWriteWithinRoot(projectFolder, requestedPath)
 }
+function workspaceFolders(context: ToolContext) { return context.sourceFolders?.length ? context.sourceFolders : (context.projectFolder ? [context.projectFolder] : []) }
+async function resolveWorkspaceExisting(context: ToolContext, requestedPath: string) { return resolveExistingWithinRoots(workspaceFolders(context), requestedPath) }
+async function resolveWorkspaceWrite(context: ToolContext, requestedPath: string) { return resolveWriteWithinRoots(workspaceFolders(context), requestedPath) }
 
 /* ---------- time_current ---------- */
 
@@ -174,10 +177,20 @@ const fileList: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const target = await resolveWithinRoot(
-        context.projectFolder,
-        typeof args.path === 'string' ? args.path : '.'
-      )
+      const requestedPath = typeof args.path === 'string' ? args.path : '.'
+      if ((requestedPath === '.' || requestedPath === '') && workspaceFolders(context).length > 1) {
+        const entries: Array<{ name: string; type: string; size?: number }> = []
+        for (const folder of workspaceFolders(context)) {
+          const dirents = await fs.readdir(folder, { withFileTypes: true })
+          entries.push({ name: path.basename(folder), type: 'directory' })
+          for (const dirent of dirents.slice(0, MAX_LIST_ENTRIES)) {
+            entries.push({ name: `${path.basename(folder)}/${dirent.name}`, type: dirent.isDirectory() ? 'directory' : dirent.isFile() ? 'file' : 'other' })
+          }
+        }
+        return ok({ path: '.', entries: entries.slice(0, MAX_LIST_ENTRIES), truncated: entries.length > MAX_LIST_ENTRIES })
+      }
+      const resolved = await resolveWorkspaceExisting(context, typeof args.path === 'string' ? args.path : '.')
+      const target = resolved.target
       const dirents = await fs.readdir(target, { withFileTypes: true })
       const entries: Array<{ name: string; type: string; size?: number }> = []
       for (const dirent of dirents.slice(0, MAX_LIST_ENTRIES)) {
@@ -196,7 +209,7 @@ const fileList: ToolDefinition = {
         })
       }
       return ok({
-        path: path.relative(context.projectFolder, target) || '.',
+        path: path.relative(resolved.root, target) || '.',
         entries,
         truncated: dirents.length > MAX_LIST_ENTRIES,
       })
@@ -226,13 +239,14 @@ const fileRead: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const target = await resolveWithinRoot(context.projectFolder, String(args.path))
+      const resolved = await resolveWorkspaceExisting(context, String(args.path))
+      const target = resolved.target
       const stat = await fs.stat(target)
       if (!stat.isFile()) return fail('FILE_ACCESS_ERROR', '目标路径不是文件')
       const content = await fs.readFile(target, 'utf-8')
       const truncated = content.length > MAX_READ_CHARS
       return ok({
-        path: path.relative(context.projectFolder, target),
+        path: path.relative(resolved.root, target),
         size: stat.size,
         truncated,
         content: truncated ? content.slice(0, MAX_READ_CHARS) : content,
@@ -273,12 +287,9 @@ const fileWrite: ToolDefinition = {
     let targetPath = typeof args.path === 'string' ? args.path : ''
     let overwrite = false
     try {
-      const target = await resolveWritePath(
-        context.projectFolder,
-        targetPath,
-        context.permissionMode === 'full'
-      )
-      targetPath = path.relative(context.projectFolder, target) || targetPath
+      const resolved = await resolveWorkspaceWrite(context, targetPath)
+      const target = resolved.target
+      targetPath = path.relative(resolved.root, target) || targetPath
       const stat = await fs.stat(target).catch(() => null)
       overwrite = stat?.isFile() ?? false
     } catch {
@@ -305,17 +316,16 @@ const fileWrite: ToolDefinition = {
       if (path.isAbsolute(relativePath) && context.permissionMode !== 'full') {
         return fail('FILE_ACCESS_ERROR', '只允许使用相对于项目文件夹的路径')
       }
-      const target = await resolveWritePath(
-        context.projectFolder,
-        relativePath,
-        context.permissionMode === 'full'
-      )
+      const resolved = context.permissionMode === 'full' && path.isAbsolute(relativePath)
+        ? { target: path.resolve(relativePath), root: context.projectFolder }
+        : await resolveWorkspaceWrite(context, relativePath)
+      const target = resolved.target
       const stat = await fs.stat(target).catch(() => null)
       if (stat?.isDirectory()) return fail('FILE_ACCESS_ERROR', '目标路径是目录，无法写入')
       await fs.mkdir(path.dirname(target), { recursive: true })
       await fs.writeFile(target, content, 'utf-8')
       return ok({
-        path: path.relative(context.projectFolder, target),
+        path: path.relative(resolved.root, target),
         bytes: Buffer.byteLength(content, 'utf-8'),
         created: !stat,
       })

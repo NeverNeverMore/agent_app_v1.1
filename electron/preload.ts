@@ -13,6 +13,7 @@ export interface ElectronAPI {
     config: ApiConfig
     messages: Array<{ role: string; content: string }>
     projectFolder: string
+    sourceFolders?: string[]
     permissionMode: PermissionMode
     conversationId: string
     attachments?: ChatAttachment[]
@@ -20,10 +21,14 @@ export interface ElectronAPI {
   }) => void
   abortMessage: (payload: { id: number }) => void
   selectFolder: () => Promise<string | null>
+  openFolder: (folder: string) => Promise<{ ok: boolean; error?: string }>
   selectAttachments: () => Promise<ChatAttachment[]>
   importAttachments: (filePaths: string[]) => Promise<ChatAttachment[]>
   getFilePath: (file: File) => string
   cleanupAttachments: (attachments: ChatAttachment[]) => Promise<{ ok: boolean }>
+  persistImagePreviews: (attachments: ChatAttachment[]) => Promise<Record<string, string>>
+  readImagePreview: (previewId: string) => Promise<string | null>
+  syncImagePreviewReferences: (referencedIds: string[]) => Promise<{ ok: boolean }>
   listTools: () => Promise<ToolMeta[]>
   listMcpServers: () => Promise<McpServerInfo[]>
   getMcpConfigJson: () => Promise<string>
@@ -78,10 +83,14 @@ const api: ElectronAPI = {
   sendMessage: (payload) => ipcRenderer.send('send-message', payload),
   abortMessage: (payload) => ipcRenderer.send('abort-message', payload),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  openFolder: (folder) => ipcRenderer.invoke('open-folder', folder),
   selectAttachments: () => ipcRenderer.invoke('select-attachments'),
   importAttachments: (filePaths) => ipcRenderer.invoke('import-attachments', filePaths),
   getFilePath: (file) => webUtils.getPathForFile(file),
   cleanupAttachments: (attachments) => ipcRenderer.invoke('cleanup-attachments', attachments),
+  persistImagePreviews: (attachments) => ipcRenderer.invoke('persist-image-previews', attachments),
+  readImagePreview: (previewId) => ipcRenderer.invoke('read-image-preview', previewId),
+  syncImagePreviewReferences: (referencedIds) => ipcRenderer.invoke('sync-image-preview-references', referencedIds),
   listTools: () => ipcRenderer.invoke('list-tools'),
   listMcpServers: () => ipcRenderer.invoke('list-mcp-servers'),
   getMcpConfigJson: () => ipcRenderer.invoke('get-mcp-config-json'),

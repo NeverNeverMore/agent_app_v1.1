@@ -19,14 +19,14 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function buildConversation(projectFolder = ''): Conversation {
+function buildConversation(projectFolder = '', projectId = ''): Conversation {
   const now = Date.now()
-  return { id: createId(), title: '新对话', messages: [], projectFolder, permissionMode: 'ask', enabledSkillIds: [], createdAt: now, updatedAt: now, projectId: '' }
+  return { id: createId(), title: '新对话', messages: [], projectFolder, permissionMode: 'ask', enabledSkillIds: [], createdAt: now, updatedAt: now, projectId }
 }
 
 function buildProject(name: string, folder: string): Project {
   const now = Date.now()
-  return { id: createId(), name, folder, createdAt: now, updatedAt: now }
+  return { id: createId(), name, folder, sourceFolders: folder ? [folder] : [], pinned: false, createdAt: now, updatedAt: now }
 }
 
 function normalizeFolder(folder: string) {
@@ -72,6 +72,10 @@ function loadState(): ConversationsState {
         ...project,
         name: typeof project.name === 'string' ? project.name : folderName(typeof project.folder === 'string' ? project.folder : ''),
         folder: typeof project.folder === 'string' ? project.folder : '',
+        sourceFolders: Array.isArray(project.sourceFolders)
+          ? [...new Set(project.sourceFolders.filter((folder): folder is string => typeof folder === 'string' && Boolean(folder.trim())).map((folder) => folder.trim()))]
+          : (typeof project.folder === 'string' && project.folder ? [project.folder] : []),
+        pinned: Boolean(project.pinned === true),
         createdAt: typeof project.createdAt === 'number' ? project.createdAt : Date.now(),
         updatedAt: typeof project.updatedAt === 'number' ? project.updatedAt : Date.now(),
       })) : []
@@ -102,17 +106,25 @@ export function useConversations() {
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch {} }, [state])
 
+  useEffect(() => {
+    const referencedIds = [...new Set(state.conversations.flatMap((conversation) =>
+      conversation.messages.flatMap((message) => (message.attachments ?? []).flatMap((attachment) => attachment.previewId ? [attachment.previewId] : []))
+    ))]
+    void window.electronAPI?.syncImagePreviewReferences(referencedIds).catch(() => undefined)
+  }, [state])
+
   const conversations = useMemo(() => state.conversations.filter(hasUserMessage).sort((a, b) => b.updatedAt - a.updatedAt), [state.conversations])
   const projects = useMemo(() => [...state.projects].filter((project) => state.conversations.some((conversation) => conversation.projectId === project.id && hasUserMessage(conversation))).sort((a, b) => {
     const latest = (project: Project) => Math.max(...state.conversations.filter((item) => item.projectId === project.id).map((item) => item.updatedAt), project.updatedAt)
-    return latest(b) - latest(a)
+    return Number(b.pinned) - Number(a.pinned) || latest(b) - latest(a)
   }), [state.projects, state.conversations])
   const activeConversation = state.conversations.find((conversation) => conversation.id === state.activeConversationId) ?? state.conversations[0]
+  const activeProject = state.projects.find((project) => project.id === activeConversation.projectId)
 
   const createConversation = useCallback((projectId?: string) => {
     setState((prev) => {
       const projectFolder = projectId ? prev.projects.find((project) => project.id === projectId)?.folder || '' : prev.lastSelectedProjectFolder
-      const conversation = buildConversation(projectFolder)
+      const conversation = buildConversation(projectFolder, projectId || '')
       return { ...prev, conversations: [...prev.conversations.filter(hasUserMessage), conversation], activeConversationId: conversation.id, lastSelectedProjectId: projectId || '', lastSelectedProjectFolder: projectFolder }
     })
   }, [])
@@ -148,10 +160,33 @@ export function useConversations() {
   }), [])
 
   const renameProject = useCallback((projectId: string, name: string) => { const trimmed = name.trim(); if (trimmed) setState((prev) => ({ ...prev, projects: prev.projects.map((project) => project.id === projectId ? { ...project, name: trimmed, updatedAt: Date.now() } : project) })) }, [])
+  const updateProject = useCallback((projectId: string, patch: Pick<Project, 'name' | 'folder' | 'sourceFolders'>) => {
+    const name = patch.name.trim()
+    if (!name || !patch.folder || !patch.sourceFolders.includes(patch.folder)) return false
+    const sourceFolders = [...new Set(patch.sourceFolders.map((folder) => folder.trim()).filter(Boolean))]
+    if (!sourceFolders.includes(patch.folder)) return false
+    setState((prev) => ({
+      ...prev,
+      projects: prev.projects.map((project) => project.id === projectId ? { ...project, name, folder: patch.folder, sourceFolders, updatedAt: Date.now() } : project),
+      conversations: prev.conversations.map((conversation) => conversation.projectId === projectId ? { ...conversation, projectFolder: patch.folder } : conversation),
+    }))
+    return true
+  }, [])
+  const toggleProjectPinned = useCallback((projectId: string) => setState((prev) => ({ ...prev, projects: prev.projects.map((project) => project.id === projectId ? { ...project, pinned: !project.pinned, updatedAt: Date.now() } : project) })), [])
+  const deleteProject = useCallback((projectId: string) => setState((prev) => {
+    const removedConversationIds = new Set(prev.conversations.filter((conversation) => conversation.projectId === projectId).map((conversation) => conversation.id))
+    const conversations = prev.conversations.filter((conversation) => !removedConversationIds.has(conversation.id))
+    const project = prev.projects.find((item) => item.id === projectId)
+    const activeConversation = prev.conversations.find((conversation) => conversation.id === prev.activeConversationId)
+    const currentWasRemoved = removedConversationIds.has(prev.activeConversationId) || Boolean(project && activeConversation && !hasUserMessage(activeConversation) && normalizeFolder(activeConversation.projectFolder) === normalizeFolder(project.folder))
+    const draft = currentWasRemoved ? buildConversation('') : undefined
+    if (draft) conversations.push(draft)
+    return { ...prev, conversations, activeConversationId: draft?.id ?? prev.activeConversationId, projects: prev.projects.filter((project) => project.id !== projectId), lastSelectedProjectId: prev.lastSelectedProjectId === projectId ? '' : prev.lastSelectedProjectId, lastSelectedProjectFolder: draft ? '' : prev.lastSelectedProjectFolder }
+  }), [])
   const moveConversation = useCallback((conversationId: string, projectId: string) => setState((prev) => ({ ...prev, conversations: prev.conversations.map((item) => item.id === conversationId ? { ...item, projectId, projectFolder: prev.projects.find((project) => project.id === projectId)?.folder || '', updatedAt: Date.now() } : item), lastSelectedProjectId: projectId })), [])
   const setProjectFolder = useCallback((projectFolder: string) => setState((prev) => ({ ...prev, conversations: prev.conversations.map((conversation) => conversation.id === prev.activeConversationId ? { ...conversation, projectFolder, ...(hasUserMessage(conversation) ? {} : { projectId: '' }), updatedAt: Date.now() } : conversation), lastSelectedProjectFolder: projectFolder })), [])
   const setPermissionMode = useCallback((permissionMode: PermissionMode) => updateConversation(activeConversation.id, (conversation) => ({ ...conversation, permissionMode })), [activeConversation.id, updateConversation])
   const setEnabledSkillIds = useCallback((enabledSkillIds: string[]) => updateConversation(activeConversation.id, (conversation) => ({ ...conversation, enabledSkillIds })), [activeConversation.id, updateConversation])
 
-  return { conversations, activeConversation, createConversation, selectConversation, updateConversation, renameConversation, deleteConversation, setProjectFolder, projects, renameProject, moveConversation, setPermissionMode, setEnabledSkillIds }
+  return { conversations, activeConversation, activeProject, createConversation, selectConversation, updateConversation, renameConversation, deleteConversation, setProjectFolder, projects, renameProject, updateProject, toggleProjectPinned, deleteProject, moveConversation, setPermissionMode, setEnabledSkillIds }
 }

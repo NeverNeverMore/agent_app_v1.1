@@ -13,6 +13,7 @@ export interface ElectronAPI {
     config: ApiConfig
     messages: Array<{ role: string; content: string }>
     projectFolder: string
+    sourceFolders?: string[]
     permissionMode: PermissionMode
     conversationId: string
     attachments?: ChatAttachment[]
@@ -20,10 +21,14 @@ export interface ElectronAPI {
   }) => void
   abortMessage: (payload: { id: number }) => void
   selectFolder: () => Promise<string | null>
+  openFolder: (folder: string) => Promise<{ ok: boolean; error?: string }>
   selectAttachments: () => Promise<ChatAttachment[]>
   importAttachments: (filePaths: string[]) => Promise<ChatAttachment[]>
   getFilePath: (file: File) => string
   cleanupAttachments: (attachments: ChatAttachment[]) => Promise<{ ok: boolean }>
+  persistImagePreviews: (attachments: ChatAttachment[]) => Promise<Record<string, string>>
+  readImagePreview: (previewId: string) => Promise<string | null>
+  syncImagePreviewReferences: (referencedIds: string[]) => Promise<{ ok: boolean }>
   listTools: () => Promise<ToolMeta[]>
   listMcpServers: () => Promise<McpServerInfo[]>
   getMcpConfigJson: () => Promise<string>

@@ -13,6 +13,7 @@ export const MAX_ATTACHMENTS = 5
 export const MAX_EXTRACTED_CHARS = 100_000
 export const MAX_TOTAL_EXTRACTED_CHARS = 180_000
 const ATTACHMENT_ROOT = "attachments"
+const PREVIEW_ROOT = "attachment-previews"
 
 const extKinds: Record<string, { kind: AttachmentKind; mimeType: string }> = {
   ".txt": { kind: "text", mimeType: "text/plain" }, ".md": { kind: "text", mimeType: "text/markdown" },
@@ -153,4 +154,50 @@ export async function cleanupOldAttachments(tempRoot: string, maxAgeMs = 60 * 60
     const stat = await fs.stat(full).catch(() => undefined)
     if (stat && now - stat.mtimeMs > maxAgeMs) await fs.rm(full, { recursive: true, force: true }).catch(() => undefined)
   }
+}
+
+function isSafeAttachmentId(id: string) {
+  return /^[\da-f-]{36}$/i.test(id)
+}
+
+export async function persistImagePreviews(tempRoot: string, userDataRoot: string, attachments: ChatAttachment[]): Promise<Record<string, string>> {
+  const previewRoot = path.join(userDataRoot, PREVIEW_ROOT)
+  await fs.mkdir(previewRoot, { recursive: true })
+  const persisted: Record<string, string> = {}
+  const allowedTempRoot = path.resolve(tempRoot, ATTACHMENT_ROOT) + path.sep
+  for (const attachment of attachments) {
+    if (attachment.kind !== "image" || !attachment.tempPath || !isSafeAttachmentId(attachment.id)) continue
+    const source = path.resolve(attachment.tempPath)
+    if (!source.startsWith(allowedTempRoot)) continue
+    const extension = path.extname(attachment.name).toLowerCase()
+    if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) continue
+    const target = path.join(previewRoot, `${attachment.id}${extension}`)
+    await fs.copyFile(source, target)
+    persisted[attachment.id] = attachment.id
+  }
+  return persisted
+}
+
+export async function readImagePreview(userDataRoot: string, previewId: string): Promise<string | null> {
+  if (!isSafeAttachmentId(previewId)) return null
+  const previewRoot = path.join(userDataRoot, PREVIEW_ROOT)
+  for (const extension of [".png", ".jpg", ".jpeg", ".webp"]) {
+    const filePath = path.join(previewRoot, `${previewId}${extension}`)
+    const data = await fs.readFile(filePath).catch(() => null)
+    if (data) {
+      const mimeType = extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg"
+      return `data:${mimeType};base64,${data.toString("base64")}`
+    }
+  }
+  return null
+}
+
+export async function cleanupUnreferencedPreviews(userDataRoot: string, referencedIds: string[]): Promise<void> {
+  const previewRoot = path.join(userDataRoot, PREVIEW_ROOT)
+  const referenced = new Set(referencedIds.filter(isSafeAttachmentId))
+  const entries = await fs.readdir(previewRoot, { withFileTypes: true }).catch(() => [])
+  await Promise.all(entries.filter((entry) => entry.isFile()).map(async (entry) => {
+    const match = /^([\da-f-]{36})\.(png|jpe?g|webp)$/i.exec(entry.name)
+    if (match && !referenced.has(match[1])) await fs.rm(path.join(previewRoot, entry.name), { force: true }).catch(() => undefined)
+  }))
 }

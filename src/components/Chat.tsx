@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { AlertTriangle, Check, ChevronUp, FolderOpen, Hand, Loader2, Send, ShieldAlert, Square, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronUp, Folder, FolderOpen, Hand, Loader2, Plus, Send, ShieldAlert, Square, X } from 'lucide-react'
 import type { Message } from '../types/chat'
 import { MessageItem } from './Message'
 import { MODEL_DISPLAY_NAME } from '../../shared/config'
@@ -15,12 +15,16 @@ interface ChatProps {
   onRetry: () => void
   onAbort: () => void
   projectFolder: string
+  sourceFolders?: string[]
   onSelectFolder: () => void
+  onOpenFolder: () => void
+  onEditProject: () => void
   permissionMode: PermissionMode
   onPermissionModeChange: (mode: PermissionMode) => void
   onApproveTool: (approvalId: string, argumentsHash: string) => void
   onRejectTool: (approvalId: string) => void
   modelName: string
+  isFileDragActive: boolean
 }
 
 export function Chat({
@@ -31,23 +35,33 @@ export function Chat({
   onRetry,
   onAbort,
   projectFolder,
-  onSelectFolder,
+  onSelectFolder: selectFolder,
+  onOpenFolder,
+  onEditProject,
   permissionMode,
   onPermissionModeChange,
   onApproveTool,
   onRejectTool,
   modelName,
+  isFileDragActive,
 }: ChatProps) {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
-  const [isDragActive, setIsDragActive] = useState(false)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [thinkingSeconds, setThinkingSeconds] = useState(0)
   const [isPermissionMenuOpen, setIsPermissionMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const permissionSelectorRef = useRef<HTMLDivElement>(null)
+  const folderSelectorRef = useRef<HTMLDivElement>(null)
+  const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false)
+  const isDraft = !messages.some((message) => message.role === 'user')
+  const onSelectFolder = () => {
+    if (isDraft) selectFolder()
+    else onEditProject()
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -95,6 +109,22 @@ export function Chat({
     }
   }, [isPermissionMenuOpen])
 
+  useEffect(() => {
+    if (!isFolderMenuOpen) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!folderSelectorRef.current?.contains(event.target as Node)) setIsFolderMenuOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFolderMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isFolderMenuOpen])
+
   const permissionOptions = [
     {
       value: 'ask' as const,
@@ -116,7 +146,14 @@ export function Chat({
     setAttachmentError('')
     try {
       const imported = await importer()
-      setAttachments((current) => [...current, ...imported].slice(0, 5))
+      const available = Math.max(0, 5 - attachments.length)
+      const accepted = imported.slice(0, available)
+      const discarded = imported.slice(available)
+      setAttachments((current) => [...current, ...accepted].slice(0, 5))
+      if (discarded.length) {
+        void window.electronAPI?.cleanupAttachments(discarded)
+        setAttachmentError(`最多可添加 5 个附件，已忽略 ${discarded.length} 个文件`)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error('附件上传失败', error)
@@ -130,6 +167,7 @@ export function Chat({
 
   const importDroppedFiles = (files: File[]) => {
     if (isLoading || !window.electronAPI) return
+    console.debug('[attachments] drop', { count: files.length, types: files.map((file) => file.type) })
     const paths = files.map((file) => {
       try {
         return window.electronAPI.getFilePath(file) || (file as File & { path?: string }).path || ''
@@ -137,50 +175,30 @@ export function Chat({
         return (file as File & { path?: string }).path || ''
       }
     }).filter(Boolean)
+    console.debug('[attachments] resolved paths', { count: paths.length })
     if (!paths.length) {
-      setAttachmentError('无法读取拖入文件，请使用本地文件或点击回形针选择')
+      setAttachmentError('无法获取本地文件路径，请确认从文件资源管理器拖入')
       return
     }
-    void addAttachments(() => window.electronAPI!.importAttachments(paths))
-  }
-
-  const handleDragOver = (event: React.DragEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    event.dataTransfer.dropEffect = 'copy'
-    if (!isLoading) setIsDragActive(true)
-  }
-
-  const handleDragLeave = (event: React.DragEvent) => {
-    event.preventDefault()
-    if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsDragActive(false)
-  }
-
-  const handleDrop = (event: React.DragEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setIsDragActive(false)
-    importDroppedFiles(Array.from(event.dataTransfer.files))
+    void addAttachments(() => window.electronAPI!.importAttachments(paths)).catch((error) => {
+      console.error('[attachments] import failed', error)
+    })
   }
 
   useEffect(() => {
-    const preventWindowFileDrop = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
-    }
-    const handleWindowDrop = (event: DragEvent) => {
-      if (!event.dataTransfer?.files.length || isLoading) return
+    const container = chatContainerRef.current
+    if (!container) return
+    const handleDrop = (event: DragEvent) => {
+      if (!Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
       event.preventDefault()
-      event.stopPropagation()
-      setIsDragActive(false)
-      importDroppedFiles(Array.from(event.dataTransfer.files))
+      const files = Array.from(event.dataTransfer?.files ?? [])
+      console.debug('[drag] chat drop target', { count: files.length, target: event.target })
+      if (!isLoading && files.length) importDroppedFiles(files)
     }
-    window.addEventListener('dragover', preventWindowFileDrop, true)
-    window.addEventListener('drop', handleWindowDrop, true)
-    return () => {
-      window.removeEventListener('dragover', preventWindowFileDrop, true)
-      window.removeEventListener('drop', handleWindowDrop, true)
-    }
-  }, [isLoading])
+    container.addEventListener('drop', handleDrop)
+    return () => container.removeEventListener('drop', handleDrop)
+  }, [isLoading, attachments.length])
+
   const removeAttachment = (attachment: ChatAttachment) => {
     setAttachments((current) => current.filter((item) => item.id !== attachment.id))
     void window.electronAPI?.cleanupAttachments([attachment])
@@ -205,7 +223,7 @@ export function Chat({
   }
 
   return (
-    <div className={`chat-container${isDragActive ? ' drag-over' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+    <div className={`chat-container${isFileDragActive ? ' drag-over' : ''}`} ref={chatContainerRef}>
       <div className="messages">
         {messages.length === 0 && (
           <div className="welcome">
@@ -322,15 +340,24 @@ export function Chat({
       </form>
       {attachmentError && <div className="attachment-error" role="alert">{attachmentError}</div>}
       <div className="project-folder-bar">
+        <div className={`folder-selector${isFolderMenuOpen ? ' open' : ''}${isDraft ? '' : ' historical'}`} ref={folderSelectorRef}>
         <button
           type="button"
           className="folder-button"
-          onClick={onSelectFolder}
+          onClick={() => !isLoading && setIsFolderMenuOpen((open) => !open)}
+          disabled={isLoading}
+          aria-label={isDraft ? '选择目录' : '编辑主目录'}
           title={projectFolder || '关联项目文件夹'}
         >
           <FolderOpen size={16} />
+          <ChevronUp size={14} className="folder-chevron" aria-hidden="true" />
           <span>{projectFolder ? projectFolder : '关联项目文件夹'}</span>
         </button>
+        {isFolderMenuOpen && <div className="folder-menu" role="menu" aria-label="项目文件夹操作">
+          <button type="button" className="folder-menu-item" role="menuitem" onClick={() => { setIsFolderMenuOpen(false); onSelectFolder() }}><Plus size={18} aria-hidden="true" /><span>选择目录</span></button>
+          <button type="button" className="folder-menu-item" role="menuitem" disabled={!projectFolder} onClick={() => { setIsFolderMenuOpen(false); onOpenFolder() }}><Folder size={18} aria-hidden="true" /><span>在文件管理器中打开</span></button>
+        </div>}
+        </div>
         <div className={`permission-selector${isPermissionMenuOpen ? ' open' : ''}`} ref={permissionSelectorRef}>
           <button
             type="button"

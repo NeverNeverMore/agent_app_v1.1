@@ -23,6 +23,7 @@ export interface AgentLoopOptions {
   config: ApiConfig
   messages: ChatMessage[]
   projectFolder: string
+  sourceFolders?: string[]
   permissionMode: PermissionMode
   requestId: number
   conversationId: string
@@ -39,6 +40,7 @@ const MAX_TOOL_STEPS = 8
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
   const { config, projectFolder, permissionMode, requestId, conversationId, signal, emitChunk, emitToolEvent, emitApproval } = options
+  const sourceFolders = options.sourceFolders?.length ? options.sourceFolders : (projectFolder ? [projectFolder] : [])
 
   const registry = getToolRegistry()
   const setStatus = (status: TaskStatus, error?: string) => options.emitTaskStatus({ status, ...(error ? { error } : {}) })
@@ -50,7 +52,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
     .map((message) => message.content)
   if (projectFolder) {
     systemPrompts.unshift(
-      `你可以使用提供的工具来回答问题和完成任务。当前项目目录：${projectFolder}。file_list 和 file_read 工具使用相对于项目目录的路径，只能访问该目录内的文件。`
+      `你可以使用提供的工具来回答问题和完成任务。当前主目录：${projectFolder}。工作区目录：${sourceFolders.join('、')}。file_list、file_read 和 file_write 使用相对于工作区的路径；附加目录可用“目录名/相对路径”访问。`
     )
   }
   if (permissionMode === 'full') {
@@ -114,7 +116,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<void> {
         arguments: call.arguments || '{}',
       })
 
-      const context: ToolContext = { projectFolder, permissionMode, signal }
+      const context: ToolContext = { projectFolder, sourceFolders, permissionMode, signal }
       const tool = registry.get(call.name)
       let executed: ExecutedToolCall
 

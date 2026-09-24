@@ -9,6 +9,7 @@ import type { ChatAttachment } from '../../shared/attachments'
 interface UseChatOptions {
   config: ApiConfig
   activeConversation: Conversation
+  sourceFolders?: string[]
   updateConversation: (
     conversationId: string,
     updater: (conversation: Conversation) => Conversation
@@ -40,6 +41,7 @@ function conversationTitle(content: string) {
 export function useChat({
   config,
   activeConversation,
+  sourceFolders = [],
   updateConversation,
 }: UseChatOptions): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false)
@@ -257,12 +259,32 @@ export function useChat({
 
       const conversationId = activeConversation.id
       lastAttachmentsRef.current = attachments
+      setIsLoading(true)
+      setTaskStatus('queued')
+      void (async () => {
+      let previewIds: Record<string, string> = {}
+      if (attachments.some((attachment) => attachment.kind === 'image')) {
+        try {
+          previewIds = await window.electronAPI.persistImagePreviews(attachments)
+        } catch (error) {
+          console.error('鏃犳硶淇濆瓨鍥剧墖棰勮', error)
+        }
+      }
+      const displayAttachments = attachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+        kind: attachment.kind,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+        parseStatus: attachment.parseStatus,
+        ...(previewIds[attachment.id] ? { previewId: previewIds[attachment.id] } : {}),
+      }))
       const baseMessages = replaceFailed && activeConversation.messages.at(-1)?.role === 'assistant' && activeConversation.messages.at(-1)?.content.startsWith('[Error:')
         ? activeConversation.messages.slice(0, -1)
         : activeConversation.messages
       const nextMessages: Message[] = [
         ...baseMessages,
-        { role: 'user', content: trimmed },
+        { role: 'user', content: trimmed, ...(displayAttachments.length ? { attachments: displayAttachments } : {}) },
       ]
 
       updateConversation(conversationId, (conversation) => ({
@@ -285,13 +307,15 @@ export function useChat({
         config,
         messages: nextMessages,
         projectFolder: activeConversation.projectFolder,
+        sourceFolders,
         permissionMode: activeConversation.permissionMode,
         conversationId,
         attachments,
         enabledSkillIds: activeConversation.enabledSkillIds,
       })
+      })()
     },
-    [activeConversation, config, updateConversation]
+    [activeConversation, config, sourceFolders, updateConversation]
   )
 
   const retryLastMessage = useCallback(() => {

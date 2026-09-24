@@ -1,10 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ApiConfig, PermissionMode } from '../shared/types'
 import type { TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
-import { cleanupAttachments, cleanupOldAttachments, prepareAttachments, selectAndCopyAttachments } from './attachments'
+import { cleanupAttachments, cleanupOldAttachments, cleanupUnreferencedPreviews, persistImagePreviews, prepareAttachments, readImagePreview, selectAndCopyAttachments } from './attachments'
 import {
   approveApproval,
   cancelApprovalsForRequest,
@@ -128,6 +128,7 @@ interface SendMessagePayload {
   config: ApiConfig
   messages: Message[]
   projectFolder?: string
+  sourceFolders?: string[]
   permissionMode?: PermissionMode
   conversationId?: string
   attachments?: ChatAttachment[]
@@ -135,7 +136,7 @@ interface SendMessagePayload {
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
+  const { id, config, messages, projectFolder = '', sourceFolders = [], permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
@@ -146,6 +147,7 @@ ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
       config,
       messages,
       projectFolder,
+      sourceFolders,
       permissionMode,
       requestId: id,
       conversationId,
@@ -250,6 +252,12 @@ ipcMain.handle('select-attachments', async () => {
 })
 
 ipcMain.handle('cleanup-attachments', async (_event, attachments: ChatAttachment[]) => { await cleanupAttachments(attachments); return { ok: true } })
+ipcMain.handle('persist-image-previews', async (_event, attachments: ChatAttachment[]) => persistImagePreviews(app.getPath('temp'), app.getPath('userData'), attachments))
+ipcMain.handle('read-image-preview', async (_event, previewId: string) => readImagePreview(app.getPath('userData'), previewId))
+ipcMain.handle('sync-image-preview-references', async (_event, referencedIds: string[]) => {
+  await cleanupUnreferencedPreviews(app.getPath('userData'), Array.isArray(referencedIds) ? referencedIds : [])
+  return { ok: true }
+})
 
 ipcMain.handle('select-folder', async () => {
   if (!mainWindow) return null
@@ -258,6 +266,16 @@ ipcMain.handle('select-folder', async () => {
     properties: ['openDirectory', 'createDirectory'],
   })
   return result.canceled ? null : result.filePaths[0] ?? null
+})
+
+ipcMain.handle('open-folder', async (_event, folder: string) => {
+  if (!folder || typeof folder !== 'string') return { ok: false, error: '目录路径为空' }
+  try {
+    const error = await shell.openPath(folder)
+    return error ? { ok: false, error } : { ok: true }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
 })
 
 ipcMain.handle('list-tools', () => getToolRegistry().listMeta())
