@@ -9,6 +9,7 @@ import type { ChatAttachment } from '../../shared/attachments'
 interface UseChatOptions {
   config: ApiConfig
   activeConversation: Conversation
+  sourceFolders?: string[]
   updateConversation: (
     conversationId: string,
     updater: (conversation: Conversation) => Conversation
@@ -40,6 +41,7 @@ function conversationTitle(content: string) {
 export function useChat({
   config,
   activeConversation,
+  sourceFolders = [],
   updateConversation,
 }: UseChatOptions): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false)
@@ -285,13 +287,14 @@ export function useChat({
         config,
         messages: nextMessages,
         projectFolder: activeConversation.projectFolder,
+        sourceFolders,
         permissionMode: activeConversation.permissionMode,
         conversationId,
         attachments,
         enabledSkillIds: activeConversation.enabledSkillIds,
       })
     },
-    [activeConversation, config, updateConversation]
+    [activeConversation, config, sourceFolders, updateConversation]
   )
 
   const retryLastMessage = useCallback(() => {

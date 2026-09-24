@@ -15,8 +15,10 @@ interface ChatProps {
   onRetry: () => void
   onAbort: () => void
   projectFolder: string
+  sourceFolders?: string[]
   onSelectFolder: () => void
   onOpenFolder: () => void
+  onEditProject: () => void
   permissionMode: PermissionMode
   onPermissionModeChange: (mode: PermissionMode) => void
   onApproveTool: (approvalId: string, argumentsHash: string) => void
@@ -32,8 +34,9 @@ export function Chat({
   onRetry,
   onAbort,
   projectFolder,
-  onSelectFolder,
+  onSelectFolder: selectFolder,
   onOpenFolder,
+  onEditProject,
   permissionMode,
   onPermissionModeChange,
   onApproveTool,
@@ -52,6 +55,11 @@ export function Chat({
   const permissionSelectorRef = useRef<HTMLDivElement>(null)
   const folderSelectorRef = useRef<HTMLDivElement>(null)
   const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false)
+  const isDraft = !messages.some((message) => message.role === 'user')
+  const onSelectFolder = () => {
+    if (isDraft) selectFolder()
+    else onEditProject()
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -342,12 +350,13 @@ export function Chat({
       </form>
       {attachmentError && <div className="attachment-error" role="alert">{attachmentError}</div>}
       <div className="project-folder-bar">
-        <div className={`folder-selector${isFolderMenuOpen ? ' open' : ''}`} ref={folderSelectorRef}>
+        <div className={`folder-selector${isFolderMenuOpen ? ' open' : ''}${isDraft ? '' : ' historical'}`} ref={folderSelectorRef}>
         <button
           type="button"
           className="folder-button"
           onClick={() => !isLoading && setIsFolderMenuOpen((open) => !open)}
           disabled={isLoading}
+          aria-label={isDraft ? '选择目录' : '编辑主目录'}
           title={projectFolder || '关联项目文件夹'}
         >
           <FolderOpen size={16} />

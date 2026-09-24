@@ -128,6 +128,7 @@ interface SendMessagePayload {
   config: ApiConfig
   messages: Message[]
   projectFolder?: string
+  sourceFolders?: string[]
   permissionMode?: PermissionMode
   conversationId?: string
   attachments?: ChatAttachment[]
@@ -135,7 +136,7 @@ interface SendMessagePayload {
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages, projectFolder = '', permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
+  const { id, config, messages, projectFolder = '', sourceFolders = [], permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
@@ -146,6 +147,7 @@ ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
       config,
       messages,
       projectFolder,
+      sourceFolders,
       permissionMode,
       requestId: id,
       conversationId,

@@ -13,6 +13,7 @@ export interface ElectronAPI {
     config: ApiConfig
     messages: Array<{ role: string; content: string }>
     projectFolder: string
+    sourceFolders?: string[]
     permissionMode: PermissionMode
     conversationId: string
     attachments?: ChatAttachment[]

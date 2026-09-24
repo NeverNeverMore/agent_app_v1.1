@@ -26,8 +26,10 @@ export interface Project {
   id: string
   name: string
   folder: string
+  sourceFolders: string[]
+  pinned: boolean
   createdAt: number
   updatedAt: number
 }
 
-export type MainSection = 'chat' | 'tools' | 'skills' | 'mcp'
+export type MainSection = 'chat' | 'tools' | 'skills' | 'mcp' | 'archive'

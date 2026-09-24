@@ -20,6 +20,7 @@ import type { PermissionMode } from '../../shared/types'
 
 export interface ToolContext {
   projectFolder: string
+  sourceFolders: string[]
   permissionMode: PermissionMode
   signal: AbortSignal
 }
