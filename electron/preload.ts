@@ -6,6 +6,7 @@ import type { TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
 import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../shared/mcp'
 import type { SkillInfo } from '../shared/skills'
+import type { KnowledgeNote, KnowledgeNoteInput, KnowledgeNotePatch, KnowledgeNoteSummary } from '../shared/knowledge'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -41,6 +42,13 @@ export interface ElectronAPI {
   listSkills: (projectFolder: string) => Promise<SkillInfo[]>
   reloadSkills: (projectFolder: string) => Promise<SkillInfo[]>
   getSkillDirectories: (projectFolder: string) => Promise<{ global: string; project: string }>
+  listKnowledgeNotes: (query?: string) => Promise<KnowledgeNoteSummary[]>
+  getKnowledgeNote: (id: string) => Promise<KnowledgeNote | null>
+  createKnowledgeNote: (input: KnowledgeNoteInput) => Promise<KnowledgeNote>
+  updateKnowledgeNote: (input: KnowledgeNotePatch) => Promise<KnowledgeNote | null>
+  deleteKnowledgeNote: (id: string) => Promise<{ ok: boolean }>
+  selectKnowledgeFiles: () => Promise<string[]>
+  importKnowledgeFiles: (filePaths: string[]) => Promise<KnowledgeNoteSummary[]>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string
@@ -103,6 +111,13 @@ const api: ElectronAPI = {
   listSkills: (projectFolder) => ipcRenderer.invoke('list-skills', projectFolder),
   reloadSkills: (projectFolder) => ipcRenderer.invoke('reload-skills', projectFolder),
   getSkillDirectories: (projectFolder) => ipcRenderer.invoke('get-skill-directories', projectFolder),
+  listKnowledgeNotes: (query) => ipcRenderer.invoke('list-knowledge-notes', query),
+  getKnowledgeNote: (id) => ipcRenderer.invoke('get-knowledge-note', id),
+  createKnowledgeNote: (input) => ipcRenderer.invoke('create-knowledge-note', input),
+  updateKnowledgeNote: (input) => ipcRenderer.invoke('update-knowledge-note', input),
+  deleteKnowledgeNote: (id) => ipcRenderer.invoke('delete-knowledge-note', id),
+  selectKnowledgeFiles: () => ipcRenderer.invoke('select-knowledge-files'),
+  importKnowledgeFiles: (filePaths) => ipcRenderer.invoke('import-knowledge-files', filePaths),
   approveTool: (payload) => ipcRenderer.invoke('approve-tool', payload),
   rejectTool: (payload) => ipcRenderer.invoke('reject-tool', payload),
   listPendingApprovals: () => ipcRenderer.invoke('list-pending-approvals'),

@@ -15,6 +15,7 @@ function fail(code: string, message: string, retryable = false): ToolResult {
 
 /** 安全边界：所有文件路径必须解析在项目文件夹之内 */
 import { resolveExistingWithinRoot, resolveWriteWithinRoot, resolveExistingWithinRoots, resolveWriteWithinRoots } from "./pathSecurity"
+import { knowledgeStore } from '../knowledge'
 
 async function resolveWithinRoot(projectFolder: string, relativePath: string): Promise<string> { return resolveExistingWithinRoot(projectFolder, relativePath) }
 async function resolveWritePath(projectFolder: string, requestedPath: string, allowOutsideRoot: boolean): Promise<string> {
@@ -432,6 +433,116 @@ const httpFetch: ToolDefinition = {
     return fail('NETWORK_ERROR', 'HTTP 请求未完成', true)
   },
 }
+
+/* ---------- knowledge base ---------- */
+
+const searchKnowledge: ToolDefinition = {
+  name: 'search_knowledge',
+  displayName: '搜索知识库',
+  description: '搜索个人知识库中的笔记和导入文件，返回相关条目的标题、来源和 ID。',
+  permission: 'read',
+  source: 'builtin',
+  category: '知识库',
+  inputSchema: {
+    type: 'object',
+    properties: { query: { type: 'string', description: '要搜索的关键词或问题' } },
+    required: ['query'],
+  },
+  execute: async (args) => {
+    try {
+      const query = typeof args.query === 'string' ? args.query : ''
+      if (!query.trim()) return fail('INVALID_ARGUMENTS', '搜索内容不能为空')
+      return ok({ query, results: await knowledgeStore.list(query) })
+    } catch (error) {
+      return fail('KNOWLEDGE_SEARCH_ERROR', error instanceof Error ? error.message : String(error), true)
+    }
+  },
+}
+
+const readNote: ToolDefinition = {
+  name: 'read_note',
+  displayName: '读取知识笔记',
+  description: '读取知识库中指定笔记的完整内容。需要先通过 search_knowledge 获取笔记 ID。',
+  permission: 'read',
+  source: 'builtin',
+  category: '知识库',
+  inputSchema: {
+    type: 'object',
+    properties: { id: { type: 'string', description: '知识库笔记 ID' } },
+    required: ['id'],
+  },
+  execute: async (args) => {
+    const id = typeof args.id === 'string' ? args.id : ''
+    const note = id ? await knowledgeStore.get(id) : null
+    return note ? ok(note) : fail('NOTE_NOT_FOUND', '知识库中没有找到指定笔记')
+  },
+}
+
+const createNote: ToolDefinition = {
+  name: 'create_note',
+  displayName: '创建知识笔记',
+  description: '在个人知识库中创建一篇 Markdown 笔记。',
+  permission: 'write',
+  source: 'builtin',
+  category: '知识库',
+  requirements: '会写入本地知识库文件',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: '笔记标题' },
+      content: { type: 'string', description: 'Markdown 正文' },
+      folder: { type: 'string', description: '文件夹名称，可选' },
+    },
+    required: ['title', 'content'],
+  },
+  describeApproval: async (args) => ({
+    targetPath: `knowledge-base/notes/${String(args.title ?? '未命名笔记')}.md`,
+    overwrite: false,
+    contentLength: String(args.content ?? '').length,
+    contentPreview: String(args.content ?? '').slice(0, 300),
+  }),
+  execute: async (args) => {
+    const title = typeof args.title === 'string' ? args.title : ''
+    const content = typeof args.content === 'string' ? args.content : ''
+    if (!title.trim()) return fail('INVALID_ARGUMENTS', '笔记标题不能为空')
+    return ok(await knowledgeStore.create({ title, content, folder: typeof args.folder === 'string' ? args.folder : undefined }))
+  },
+}
+
+const updateNote: ToolDefinition = {
+  name: 'update_note',
+  displayName: '更新知识笔记',
+  description: '更新个人知识库中的 Markdown 笔记。需要先通过 search_knowledge 获取笔记 ID。',
+  permission: 'write',
+  source: 'builtin',
+  category: '知识库',
+  requirements: '会修改本地知识库文件',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: '知识库笔记 ID' },
+      title: { type: 'string', description: '笔记标题' },
+      content: { type: 'string', description: 'Markdown 正文' },
+      folder: { type: 'string', description: '文件夹名称，可选' },
+    },
+    required: ['id', 'title', 'content'],
+  },
+  describeApproval: async (args) => ({
+    targetPath: `knowledge-base/notes/${String(args.id ?? '')}.md`,
+    overwrite: true,
+    contentLength: String(args.content ?? '').length,
+    contentPreview: String(args.content ?? '').slice(0, 300),
+  }),
+  execute: async (args) => {
+    const id = typeof args.id === 'string' ? args.id : ''
+    const title = typeof args.title === 'string' ? args.title : ''
+    const content = typeof args.content === 'string' ? args.content : ''
+    if (!id || !title.trim()) return fail('INVALID_ARGUMENTS', '笔记 ID 和标题不能为空')
+    const note = await knowledgeStore.update({ id, title, content, folder: typeof args.folder === 'string' ? args.folder : undefined })
+    return note ? ok(note) : fail('NOTE_NOT_FOUND', '知识库中没有找到指定笔记')
+  },
+}
+
 export function createBuiltinTools(): ToolDefinition[] {
-  return [timeCurrent, calculator, fileList, fileRead, fileWrite, httpFetch]
+  return [timeCurrent, calculator, fileList, fileRead, fileWrite, httpFetch, searchKnowledge, readNote, createNote, updateNote]
 }

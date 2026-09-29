@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Archive, ChevronDown, ChevronRight, Ellipsis, ExternalLink, Folder, MessageSquarePlus, Pencil, Pin, Plug, Sparkles, Trash2, Wrench } from 'lucide-react'
+import { Archive, BookOpen, ChevronDown, ChevronRight, Ellipsis, ExternalLink, Folder, MessageSquarePlus, Pencil, Pin, Plug, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { APP_NAME } from '../../shared/config'
 import type { Conversation, MainSection, Project } from '../types/chat'
 
@@ -23,6 +23,7 @@ const sectionItems = [
   { section: 'tools', label: '工具', icon: <Wrench size={18} /> },
   { section: 'skills', label: 'Skills', icon: <Sparkles size={18} /> },
   { section: 'mcp', label: 'MCP', icon: <Plug size={18} /> },
+  { section: 'knowledge', label: '知识库', icon: <BookOpen size={18} /> },
   { section: 'archive', label: '会话归档', icon: <Archive size={18} /> },
 ] as const
 

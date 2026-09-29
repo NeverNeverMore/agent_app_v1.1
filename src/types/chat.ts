@@ -32,4 +32,4 @@ export interface Project {
   updatedAt: number
 }
 
-export type MainSection = 'chat' | 'tools' | 'skills' | 'mcp' | 'archive'
+export type MainSection = 'chat' | 'tools' | 'skills' | 'mcp' | 'knowledge' | 'archive'

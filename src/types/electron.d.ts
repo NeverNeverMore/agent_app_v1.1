@@ -6,6 +6,7 @@ import type { TaskStatusEvent } from '../../shared/task'
 import type { ChatAttachment } from '../../shared/attachments'
 import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../../shared/mcp'
 import type { SkillInfo } from '../../shared/skills'
+import type { KnowledgeNote, KnowledgeNoteInput, KnowledgeNotePatch, KnowledgeNoteSummary } from '../../shared/knowledge'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -41,6 +42,13 @@ export interface ElectronAPI {
   listSkills: (projectFolder: string) => Promise<SkillInfo[]>
   reloadSkills: (projectFolder: string) => Promise<SkillInfo[]>
   getSkillDirectories: (projectFolder: string) => Promise<{ global: string; project: string }>
+  listKnowledgeNotes: (query?: string) => Promise<KnowledgeNoteSummary[]>
+  getKnowledgeNote: (id: string) => Promise<KnowledgeNote | null>
+  createKnowledgeNote: (input: KnowledgeNoteInput) => Promise<KnowledgeNote>
+  updateKnowledgeNote: (input: KnowledgeNotePatch) => Promise<KnowledgeNote | null>
+  deleteKnowledgeNote: (id: string) => Promise<{ ok: boolean }>
+  selectKnowledgeFiles: () => Promise<string[]>
+  importKnowledgeFiles: (filePaths: string[]) => Promise<KnowledgeNoteSummary[]>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string

@@ -18,6 +18,8 @@ import { protocolEndpoint } from './protocol'
 import { McpManager } from './mcp'
 import type { McpServerConfig } from '../shared/mcp'
 import { skillManager } from './skills'
+import { knowledgeStore } from './knowledge'
+import type { KnowledgeNoteInput, KnowledgeNotePatch } from '../shared/knowledge'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -101,10 +103,11 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   configureApprovalStore(path.join(app.getPath('userData'), 'pending-approvals.json'))
   void cleanupOldAttachments(app.getPath('temp'))
   skillManager.initialize(app.getPath('userData'))
+  await knowledgeStore.initialize(app.getPath('userData'))
   void mcpManager.initialize(app.getPath('userData'), getToolRegistry())
   createWindow()
   createApplicationMenu()
@@ -277,6 +280,22 @@ ipcMain.handle('open-folder', async (_event, folder: string) => {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
+
+ipcMain.handle('list-knowledge-notes', async (_event, query?: string) => knowledgeStore.list(typeof query === 'string' ? query : ''))
+ipcMain.handle('get-knowledge-note', async (_event, id: string) => knowledgeStore.get(id))
+ipcMain.handle('create-knowledge-note', async (_event, input: KnowledgeNoteInput) => knowledgeStore.create(input))
+ipcMain.handle('update-knowledge-note', async (_event, input: KnowledgeNotePatch) => knowledgeStore.update(input))
+ipcMain.handle('delete-knowledge-note', async (_event, id: string) => ({ ok: await knowledgeStore.remove(id) }))
+ipcMain.handle('select-knowledge-files', async () => {
+  if (!mainWindow) return []
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '导入知识库文件',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '知识库文件', extensions: ['md', 'markdown', 'txt', 'json', 'csv', 'html', 'pdf', 'docx', 'xlsx', 'xls', 'pptx'] }],
+  })
+  return result.canceled ? [] : result.filePaths
+})
+ipcMain.handle('import-knowledge-files', async (_event, filePaths: string[]) => knowledgeStore.importFiles(Array.isArray(filePaths) ? filePaths : []))
 
 ipcMain.handle('list-tools', () => getToolRegistry().listMeta())
 

@@ -8,6 +8,7 @@ import { ToolList } from './components/ToolList'
 import { McpManager } from './components/McpManager'
 import { SkillManager } from './components/SkillManager'
 import { ProjectEditor } from './components/ProjectEditor'
+import { KnowledgeBase } from './components/KnowledgeBase'
 import { useChat } from './hooks/useChat'
 import { useApiConfig } from './hooks/useApiConfig'
 import { useConversations } from './hooks/useConversations'
@@ -29,6 +30,10 @@ const sectionCopy: Record<
   mcp: {
     title: 'MCP',
     description: 'MCP 服务入口已预留，后续可在这里配置和管理服务。',
+  },
+  knowledge: {
+    title: '知识库',
+    description: '管理本地 Markdown 笔记和导入文件。',
   },
 }
 
@@ -244,6 +249,8 @@ function App() {
               enabledSkillIds={activeConversation.enabledSkillIds}
               onEnabledSkillIdsChange={setEnabledSkillIds}
             />
+          ) : activeSection === 'knowledge' ? (
+            <KnowledgeBase />
           ) : (
             <PlaceholderPanel section={activeSection} />
           )}
