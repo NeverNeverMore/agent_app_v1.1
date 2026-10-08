@@ -16,6 +16,7 @@ export interface Conversation {
   messages: Message[]
   projectFolder: string
   permissionMode: PermissionMode
+  useKnowledgeBase: boolean
   enabledSkillIds: string[]
   createdAt: number
   updatedAt: number

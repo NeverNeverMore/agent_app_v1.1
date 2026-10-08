@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { AlertTriangle, Check, ChevronUp, Folder, FolderOpen, Hand, Loader2, Plus, Send, ShieldAlert, Square, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Check, ChevronUp, Folder, FolderOpen, Hand, Loader2, Plus, Send, ShieldAlert, Square, X } from 'lucide-react'
 import type { Message } from '../types/chat'
 import { MessageItem } from './Message'
 import { MODEL_DISPLAY_NAME } from '../../shared/config'
@@ -21,6 +21,8 @@ interface ChatProps {
   onEditProject: () => void
   permissionMode: PermissionMode
   onPermissionModeChange: (mode: PermissionMode) => void
+  useKnowledgeBase: boolean
+  onKnowledgeBaseChange: (enabled: boolean) => void
   onApproveTool: (approvalId: string, argumentsHash: string) => void
   onRejectTool: (approvalId: string) => void
   modelName: string
@@ -40,6 +42,8 @@ export function Chat({
   onEditProject,
   permissionMode,
   onPermissionModeChange,
+  useKnowledgeBase,
+  onKnowledgeBaseChange,
   onApproveTool,
   onRejectTool,
   modelName,
@@ -237,7 +241,7 @@ export function Chat({
         {isLoading && (
           <div className="thinking-status" role="status" aria-live="polite">
             <Loader2 size={16} className="spin" />
-            <span>{taskStatus === 'waiting_approval' ? '等待用户确认' : taskStatus === 'running_tool' ? '正在执行工具' : '思考中'}... {thinkingSeconds}秒</span>
+            <span>{taskStatus === 'waiting_approval' ? '等待用户确认' : taskStatus === 'running_tool' ? '正在执行工具' : taskStatus === 'retrieving_knowledge' ? '正在检索知识库' : '思考中'}... {thinkingSeconds}秒</span>
           </div>
         )}
         {!isLoading && taskStatus === 'failed' && (
@@ -358,6 +362,18 @@ export function Chat({
           <button type="button" className="folder-menu-item" role="menuitem" disabled={!projectFolder} onClick={() => { setIsFolderMenuOpen(false); onOpenFolder() }}><Folder size={18} aria-hidden="true" /><span>在文件管理器中打开</span></button>
         </div>}
         </div>
+        <button
+          type="button"
+          className={`knowledge-toggle${useKnowledgeBase ? ' active' : ''}`}
+          onClick={() => onKnowledgeBaseChange(!useKnowledgeBase)}
+          disabled={isLoading}
+          aria-pressed={useKnowledgeBase}
+          title="开启后发送消息前会先检索本地知识库"
+        >
+          <BookOpen size={16} aria-hidden="true" />
+          <span>使用知识库</span>
+          <span className="knowledge-toggle-state">{useKnowledgeBase ? '开' : '关'}</span>
+        </button>
         <div className={`permission-selector${isPermissionMenuOpen ? ' open' : ''}`} ref={permissionSelectorRef}>
           <button
             type="button"

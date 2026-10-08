@@ -2,6 +2,7 @@ export type TaskStatus =
   | "queued"
   | "preparing_attachments"
   | "parsing_attachments"
+  | "retrieving_knowledge"
   | "generating"
   | "waiting_approval"
   | "running_tool"

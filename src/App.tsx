@@ -70,6 +70,7 @@ function App() {
     deleteConversation,
     setProjectFolder,
     setPermissionMode,
+    setUseKnowledgeBase,
     setEnabledSkillIds,
     projects,
     activeProject,
@@ -234,6 +235,8 @@ function App() {
               onEditProject={handleEditActiveProject}
               permissionMode={activeConversation.permissionMode}
               onPermissionModeChange={setPermissionMode}
+              useKnowledgeBase={activeConversation.useKnowledgeBase}
+              onKnowledgeBaseChange={setUseKnowledgeBase}
               onApproveTool={approveToolCall}
               onRejectTool={rejectToolCall}
               modelName={config.model}

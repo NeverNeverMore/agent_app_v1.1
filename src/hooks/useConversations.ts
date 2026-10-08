@@ -21,7 +21,7 @@ function createId() {
 
 function buildConversation(projectFolder = '', projectId = ''): Conversation {
   const now = Date.now()
-  return { id: createId(), title: '新对话', messages: [], projectFolder, permissionMode: 'ask', enabledSkillIds: [], createdAt: now, updatedAt: now, projectId }
+  return { id: createId(), title: '新对话', messages: [], projectFolder, permissionMode: 'ask', useKnowledgeBase: false, enabledSkillIds: [], createdAt: now, updatedAt: now, projectId }
 }
 
 function buildProject(name: string, folder: string): Project {
@@ -66,6 +66,7 @@ function loadState(): ConversationsState {
         projectFolder: typeof conversation.projectFolder === 'string' ? conversation.projectFolder : '',
         projectId: typeof conversation.projectId === 'string' ? conversation.projectId : '',
         permissionMode: (conversation.permissionMode === 'full' ? 'full' : 'ask') as PermissionMode,
+        useKnowledgeBase: conversation.useKnowledgeBase === true,
         enabledSkillIds: Array.isArray(conversation.enabledSkillIds) ? conversation.enabledSkillIds.filter((id): id is string => typeof id === 'string') : [],
       })) : []
       const projects = Array.isArray(parsed.projects) ? parsed.projects.filter((project): project is Project => Boolean(project && typeof project === 'object' && typeof (project as Project).id === 'string')).map((project) => ({
@@ -186,7 +187,8 @@ export function useConversations() {
   const moveConversation = useCallback((conversationId: string, projectId: string) => setState((prev) => ({ ...prev, conversations: prev.conversations.map((item) => item.id === conversationId ? { ...item, projectId, projectFolder: prev.projects.find((project) => project.id === projectId)?.folder || '', updatedAt: Date.now() } : item), lastSelectedProjectId: projectId })), [])
   const setProjectFolder = useCallback((projectFolder: string) => setState((prev) => ({ ...prev, conversations: prev.conversations.map((conversation) => conversation.id === prev.activeConversationId ? { ...conversation, projectFolder, ...(hasUserMessage(conversation) ? {} : { projectId: '' }), updatedAt: Date.now() } : conversation), lastSelectedProjectFolder: projectFolder })), [])
   const setPermissionMode = useCallback((permissionMode: PermissionMode) => updateConversation(activeConversation.id, (conversation) => ({ ...conversation, permissionMode })), [activeConversation.id, updateConversation])
+  const setUseKnowledgeBase = useCallback((useKnowledgeBase: boolean) => updateConversation(activeConversation.id, (conversation) => ({ ...conversation, useKnowledgeBase })), [activeConversation.id, updateConversation])
   const setEnabledSkillIds = useCallback((enabledSkillIds: string[]) => updateConversation(activeConversation.id, (conversation) => ({ ...conversation, enabledSkillIds })), [activeConversation.id, updateConversation])
 
-  return { conversations, activeConversation, activeProject, createConversation, selectConversation, updateConversation, renameConversation, deleteConversation, setProjectFolder, projects, renameProject, updateProject, toggleProjectPinned, deleteProject, moveConversation, setPermissionMode, setEnabledSkillIds }
+  return { conversations, activeConversation, activeProject, createConversation, selectConversation, updateConversation, renameConversation, deleteConversation, setProjectFolder, projects, renameProject, updateProject, toggleProjectPinned, deleteProject, moveConversation, setPermissionMode, setUseKnowledgeBase, setEnabledSkillIds }
 }

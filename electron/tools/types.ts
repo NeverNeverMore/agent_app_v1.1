@@ -22,6 +22,7 @@ export interface ToolContext {
   projectFolder: string
   sourceFolders: string[]
   permissionMode: PermissionMode
+  knowledgeEnabled: boolean
   signal: AbortSignal
 }
 

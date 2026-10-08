@@ -1251,6 +1251,10 @@ input {
 }
 .approval-model { max-width: 150px; margin-left: auto; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .chat-model-name { max-width: 180px; margin-left: auto; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.knowledge-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; color: var(--text-secondary); font-size: 12px; }
+.knowledge-toggle:hover:not(:disabled) { background: var(--surface); color: var(--accent); }
+.knowledge-toggle.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.knowledge-toggle-state { min-width: 14px; font-size: 11px; font-weight: 600; }
 
 .approval-banner-title {
   font-weight: 600;
@@ -1480,11 +1484,45 @@ input {
 .knowledge-nav:hover, .knowledge-nav.active { background: var(--accent-soft); color: var(--accent); }
 .knowledge-nav span { margin-left: auto; color: var(--text-secondary); font-size: 11px; }
 .knowledge-folder-hint { padding: 0 8px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.knowledge-folder-row { position: relative; display: flex; align-items: center; margin: 2px 0; border-radius: 7px; }
+.knowledge-folder-row > .knowledge-nav { flex: 1; min-width: 0; }
+.knowledge-folder-row.active { background: var(--accent-soft); }
+.knowledge-folder-row.active > .knowledge-nav { background: transparent; color: var(--accent); }
+.knowledge-folder-menu-button { display: inline-flex; align-items: center; justify-content: center; margin-right: 5px; padding: 5px; border-radius: 5px; color: var(--text-secondary); }
+.knowledge-folder-menu-button:hover { background: var(--surface); color: var(--accent); }
+.knowledge-folder-menu { position: absolute; top: calc(100% + 3px); right: 5px; z-index: 30; min-width: 130px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+.knowledge-folder-menu button { display: flex; align-items: center; gap: 7px; width: 100%; padding: 7px 8px; border-radius: 5px; color: var(--text); text-align: left; font-size: 12px; }
+.knowledge-folder-menu button:hover { background: var(--bg); }
+.knowledge-folder-menu button.danger { color: var(--danger); }
+.knowledge-folder-rename { flex: 1; min-width: 0; margin: 3px 5px; padding: 6px 7px; border: 1px solid var(--accent); border-radius: 5px; background: var(--surface); color: var(--text); font-size: 13px; }
+.knowledge-modal-overlay { position: fixed; inset: 0; z-index: 150; display: flex; align-items: flex-start; justify-content: center; padding: 12vh 20px; background: rgba(15,23,42,.28); }
+.knowledge-modal { width: min(420px, 100%); padding: 22px; border-radius: 10px; background: var(--surface); box-shadow: 0 18px 60px rgba(0,0,0,.22); }
+.knowledge-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.knowledge-modal-header h3 { color: var(--text); font-size: 18px; }
+.knowledge-modal label { display: block; margin-top: 20px; color: var(--text); font-size: 13px; }
+.knowledge-modal label input { display: block; width: 100%; margin-top: 7px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 14px; }
+.knowledge-modal label select { display: block; width: 100%; margin-top: 7px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; }
+.knowledge-action-note-title { margin-top: 16px; color: var(--text-secondary); font-size: 13px; overflow-wrap: anywhere; }
+.knowledge-modal-help { margin-top: 7px; color: var(--text-secondary); font-size: 12px; }
+.knowledge-delete-warning { margin-top: 20px; color: var(--text); font-size: 13px; line-height: 1.7; }
+.knowledge-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.danger-button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; padding: 9px 14px; background: var(--danger); color: #fff; cursor: pointer; font-size: 13px; }
 .knowledge-search { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; padding: 8px 9px; border: 1px solid var(--border); border-radius: 7px; color: var(--text-secondary); }
 .knowledge-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--text); font-size: 13px; }
 .knowledge-note-item { display: block; width: 100%; padding: 10px; border-radius: 7px; text-align: left; }
-.knowledge-note-item:hover, .knowledge-note-item.active { background: var(--accent-soft); }
+.knowledge-note-row { position: relative; display: flex; align-items: center; margin: 3px 0; border-radius: 7px; }
+.knowledge-note-row:hover, .knowledge-note-row.active { background: var(--accent-soft); }
+.knowledge-note-row .knowledge-note-item { flex: 1; min-width: 0; background: transparent; }
+.knowledge-note-row .knowledge-note-item:hover { background: transparent; }
+.knowledge-note-menu-button { display: inline-flex; align-items: center; justify-content: center; margin-right: 5px; padding: 5px; border-radius: 5px; color: var(--text-secondary); opacity: 0; }
+.knowledge-note-row:hover .knowledge-note-menu-button, .knowledge-note-menu-button:focus-visible, .knowledge-note-menu-button[aria-expanded="true"] { opacity: 1; }
+.knowledge-note-menu-button:hover { background: var(--surface); color: var(--accent); }
+.knowledge-note-menu { position: absolute; top: calc(100% + 2px); right: 5px; z-index: 35; min-width: 130px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+.knowledge-note-menu button { display: block; width: 100%; padding: 7px 9px; border-radius: 5px; color: var(--text); text-align: left; font-size: 12px; }
+.knowledge-note-menu button:hover { background: var(--bg); }
+.knowledge-note-menu button.danger { color: var(--danger); }
 .knowledge-note-item strong { display: block; overflow: hidden; color: var(--text); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.knowledge-note-row.active .knowledge-note-item strong { color: var(--accent); }
 .knowledge-note-item.active strong { color: var(--accent); }
 .knowledge-note-item small { display: block; margin-top: 3px; color: var(--text-secondary); font-size: 11px; }
 .knowledge-empty { padding: 26px 8px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; text-align: center; }

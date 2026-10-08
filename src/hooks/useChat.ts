@@ -309,6 +309,7 @@ export function useChat({
         projectFolder: activeConversation.projectFolder,
         sourceFolders,
         permissionMode: activeConversation.permissionMode,
+        useKnowledgeBase: activeConversation.useKnowledgeBase,
         conversationId,
         attachments,
         enabledSkillIds: activeConversation.enabledSkillIds,

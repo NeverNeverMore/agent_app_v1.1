@@ -19,7 +19,7 @@ import { McpManager } from './mcp'
 import type { McpServerConfig } from '../shared/mcp'
 import { skillManager } from './skills'
 import { knowledgeStore } from './knowledge'
-import type { KnowledgeNoteInput, KnowledgeNotePatch } from '../shared/knowledge'
+import type { KnowledgeFolderInput, KnowledgeNoteInput, KnowledgeNotePatch } from '../shared/knowledge'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -133,13 +133,14 @@ interface SendMessagePayload {
   projectFolder?: string
   sourceFolders?: string[]
   permissionMode?: PermissionMode
+  useKnowledgeBase?: boolean
   conversationId?: string
   attachments?: ChatAttachment[]
   enabledSkillIds?: string[]
 }
 
 ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
-  const { id, config, messages, projectFolder = '', sourceFolders = [], permissionMode = 'ask', conversationId = '', attachments = [], enabledSkillIds = [] } = payload
+  const { id, config, messages, projectFolder = '', sourceFolders = [], permissionMode = 'ask', useKnowledgeBase = false, conversationId = '', attachments = [], enabledSkillIds = [] } = payload
   const controller = new AbortController()
   abortControllers.set(id, controller)
 
@@ -152,6 +153,7 @@ ipcMain.on('send-message', async (event, payload: SendMessagePayload) => {
       projectFolder,
       sourceFolders,
       permissionMode,
+      useKnowledgeBase,
       requestId: id,
       conversationId,
       attachments: preparedAttachments,
@@ -286,6 +288,8 @@ ipcMain.handle('get-knowledge-note', async (_event, id: string) => knowledgeStor
 ipcMain.handle('create-knowledge-note', async (_event, input: KnowledgeNoteInput) => knowledgeStore.create(input))
 ipcMain.handle('update-knowledge-note', async (_event, input: KnowledgeNotePatch) => knowledgeStore.update(input))
 ipcMain.handle('delete-knowledge-note', async (_event, id: string) => ({ ok: await knowledgeStore.remove(id) }))
+ipcMain.handle('move-knowledge-note', async (_event, id: string, targetFolder: string) => knowledgeStore.moveNote(id, targetFolder))
+ipcMain.handle('copy-knowledge-note', async (_event, id: string, targetFolder: string) => knowledgeStore.copyNote(id, targetFolder))
 ipcMain.handle('select-knowledge-files', async () => {
   if (!mainWindow) return []
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -295,7 +299,12 @@ ipcMain.handle('select-knowledge-files', async () => {
   })
   return result.canceled ? [] : result.filePaths
 })
-ipcMain.handle('import-knowledge-files', async (_event, filePaths: string[]) => knowledgeStore.importFiles(Array.isArray(filePaths) ? filePaths : []))
+ipcMain.handle('import-knowledge-files', async (_event, filePaths: string[], folderName: string) => knowledgeStore.importFiles(Array.isArray(filePaths) ? filePaths : [], typeof folderName === 'string' ? folderName : '默认'))
+ipcMain.handle('list-knowledge-folders', async () => knowledgeStore.listFolders())
+ipcMain.handle('create-knowledge-folder', async (_event, input: KnowledgeFolderInput) => knowledgeStore.createFolder(input?.name ?? ''))
+ipcMain.handle('rename-knowledge-folder', async (_event, id: string, name: string) => knowledgeStore.renameFolder(id, name))
+ipcMain.handle('set-knowledge-folder-pinned', async (_event, id: string, pinned: boolean) => knowledgeStore.setFolderPinned(id, pinned))
+ipcMain.handle('delete-knowledge-folder', async (_event, id: string) => ({ ok: await knowledgeStore.deleteFolder(id) }))
 
 ipcMain.handle('list-tools', () => getToolRegistry().listMeta())
 

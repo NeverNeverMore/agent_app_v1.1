@@ -6,7 +6,7 @@ import type { TaskStatusEvent } from '../../shared/task'
 import type { ChatAttachment } from '../../shared/attachments'
 import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../../shared/mcp'
 import type { SkillInfo } from '../../shared/skills'
-import type { KnowledgeNote, KnowledgeNoteInput, KnowledgeNotePatch, KnowledgeNoteSummary } from '../../shared/knowledge'
+import type { KnowledgeFolder, KnowledgeFolderInput, KnowledgeNote, KnowledgeNoteInput, KnowledgeNotePatch, KnowledgeNoteSummary } from '../../shared/knowledge'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -16,6 +16,7 @@ export interface ElectronAPI {
     projectFolder: string
     sourceFolders?: string[]
     permissionMode: PermissionMode
+    useKnowledgeBase?: boolean
     conversationId: string
     attachments?: ChatAttachment[]
     enabledSkillIds?: string[]
@@ -47,8 +48,15 @@ export interface ElectronAPI {
   createKnowledgeNote: (input: KnowledgeNoteInput) => Promise<KnowledgeNote>
   updateKnowledgeNote: (input: KnowledgeNotePatch) => Promise<KnowledgeNote | null>
   deleteKnowledgeNote: (id: string) => Promise<{ ok: boolean }>
+  moveKnowledgeNote: (id: string, targetFolder: string) => Promise<KnowledgeNoteSummary | null>
+  copyKnowledgeNote: (id: string, targetFolder: string) => Promise<KnowledgeNoteSummary | null>
   selectKnowledgeFiles: () => Promise<string[]>
-  importKnowledgeFiles: (filePaths: string[]) => Promise<KnowledgeNoteSummary[]>
+  importKnowledgeFiles: (filePaths: string[], folderName: string) => Promise<KnowledgeNoteSummary[]>
+  listKnowledgeFolders: () => Promise<KnowledgeFolder[]>
+  createKnowledgeFolder: (input: KnowledgeFolderInput) => Promise<KnowledgeFolder>
+  renameKnowledgeFolder: (id: string, name: string) => Promise<KnowledgeFolder | null>
+  setKnowledgeFolderPinned: (id: string, pinned: boolean) => Promise<KnowledgeFolder | null>
+  deleteKnowledgeFolder: (id: string) => Promise<{ ok: boolean }>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string

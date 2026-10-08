@@ -6,7 +6,7 @@ import type { TaskStatusEvent } from '../shared/task'
 import type { ChatAttachment } from '../shared/attachments'
 import type { McpServerConfig, McpServerEvent, McpServerInfo } from '../shared/mcp'
 import type { SkillInfo } from '../shared/skills'
-import type { KnowledgeNote, KnowledgeNoteInput, KnowledgeNotePatch, KnowledgeNoteSummary } from '../shared/knowledge'
+import type { KnowledgeFolder, KnowledgeFolderInput, KnowledgeNote, KnowledgeNoteInput, KnowledgeNotePatch, KnowledgeNoteSummary } from '../shared/knowledge'
 
 export interface ElectronAPI {
   sendMessage: (payload: {
@@ -16,6 +16,7 @@ export interface ElectronAPI {
     projectFolder: string
     sourceFolders?: string[]
     permissionMode: PermissionMode
+    useKnowledgeBase?: boolean
     conversationId: string
     attachments?: ChatAttachment[]
     enabledSkillIds?: string[]
@@ -47,8 +48,15 @@ export interface ElectronAPI {
   createKnowledgeNote: (input: KnowledgeNoteInput) => Promise<KnowledgeNote>
   updateKnowledgeNote: (input: KnowledgeNotePatch) => Promise<KnowledgeNote | null>
   deleteKnowledgeNote: (id: string) => Promise<{ ok: boolean }>
+  moveKnowledgeNote: (id: string, targetFolder: string) => Promise<KnowledgeNoteSummary | null>
+  copyKnowledgeNote: (id: string, targetFolder: string) => Promise<KnowledgeNoteSummary | null>
   selectKnowledgeFiles: () => Promise<string[]>
-  importKnowledgeFiles: (filePaths: string[]) => Promise<KnowledgeNoteSummary[]>
+  importKnowledgeFiles: (filePaths: string[], folderName: string) => Promise<KnowledgeNoteSummary[]>
+  listKnowledgeFolders: () => Promise<KnowledgeFolder[]>
+  createKnowledgeFolder: (input: KnowledgeFolderInput) => Promise<KnowledgeFolder>
+  renameKnowledgeFolder: (id: string, name: string) => Promise<KnowledgeFolder | null>
+  setKnowledgeFolderPinned: (id: string, pinned: boolean) => Promise<KnowledgeFolder | null>
+  deleteKnowledgeFolder: (id: string) => Promise<{ ok: boolean }>
   approveTool: (payload: {
     approvalId: string
     argumentsHash: string
@@ -116,8 +124,15 @@ const api: ElectronAPI = {
   createKnowledgeNote: (input) => ipcRenderer.invoke('create-knowledge-note', input),
   updateKnowledgeNote: (input) => ipcRenderer.invoke('update-knowledge-note', input),
   deleteKnowledgeNote: (id) => ipcRenderer.invoke('delete-knowledge-note', id),
+  moveKnowledgeNote: (id, targetFolder) => ipcRenderer.invoke('move-knowledge-note', id, targetFolder),
+  copyKnowledgeNote: (id, targetFolder) => ipcRenderer.invoke('copy-knowledge-note', id, targetFolder),
   selectKnowledgeFiles: () => ipcRenderer.invoke('select-knowledge-files'),
-  importKnowledgeFiles: (filePaths) => ipcRenderer.invoke('import-knowledge-files', filePaths),
+  importKnowledgeFiles: (filePaths, folderName) => ipcRenderer.invoke('import-knowledge-files', filePaths, folderName),
+  listKnowledgeFolders: () => ipcRenderer.invoke('list-knowledge-folders'),
+  createKnowledgeFolder: (input) => ipcRenderer.invoke('create-knowledge-folder', input),
+  renameKnowledgeFolder: (id, name) => ipcRenderer.invoke('rename-knowledge-folder', id, name),
+  setKnowledgeFolderPinned: (id, pinned) => ipcRenderer.invoke('set-knowledge-folder-pinned', id, pinned),
+  deleteKnowledgeFolder: (id) => ipcRenderer.invoke('delete-knowledge-folder', id),
   approveTool: (payload) => ipcRenderer.invoke('approve-tool', payload),
   rejectTool: (payload) => ipcRenderer.invoke('reject-tool', payload),
   listPendingApprovals: () => ipcRenderer.invoke('list-pending-approvals'),
